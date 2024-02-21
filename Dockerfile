@@ -10,10 +10,10 @@ COPY .env /app/.env
 
 
 # Copy the persist directory into the container
-COPY data/persist /app/data/persist
+COPY persist /app/persist
 
 # Install any necessary dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Start the Streamlit application
-CMD ["streamlit", "run", "src/multi_doc\-agents.py", "--server.port=80"]
+CMD ["streamlit", "run", "multi_doc_agents.py", "--server.port=80"]

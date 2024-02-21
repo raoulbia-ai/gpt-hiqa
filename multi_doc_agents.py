@@ -122,14 +122,14 @@ async def build_agent_per_doc(nodes, file_base):
         QueryEngineTool(
             query_engine=vector_query_engine,
             metadata=ToolMetadata(
-                name=f"vector_tool_{file_base}",
+                name=f"{file_base}",
                 description=f"Useful for questions related to specific facts",
             ),
         ),
         QueryEngineTool(
             query_engine=summary_query_engine,
             metadata=ToolMetadata(
-                name=f"summary_tool_{file_base}",
+                name=f"{file_base}",
                 description=f"Useful for summarization questions",
             ),
         ),
@@ -156,58 +156,52 @@ async def build_agents(docs):
 
     # Build agents dictionary
     agents_dict = {}
-    extra_info_dict = {}
-
-    if 'agents_dict' not in st.session_state:
-            st.session_state['agents_dict'] = {}
-            st.session_state['extra_info_dict'] = {}
-   
+    extra_info_dict = {}    
+    
     for idx, doc in enumerate(tqdm(docs)):
         nodes = node_parser.get_nodes_from_documents([doc])
         # all_nodes.extend(nodes)
 
         # ID will be base + parent
-        file_path = Path(doc.metadata["path"])
-        file_base = str(file_path.parent.stem) + "_" + str(file_path.stem)
+        # file_path = Path(doc.metadata["path"])
+        # file_base = str(file_path.parent.stem) + "_" + str(file_path.stem)
+        file_base = str(file_path.stem)
         agent, summary = await build_agent_per_doc(nodes, file_base)
 
-        st.session_state['agents_dict'][file_base] = agent
-        st.session_state['extra_info_dict'][file_base] = {"summary": summary, "nodes": nodes}
+        agents_dict[file_base] = agent
+        extra_info_dict[file_base] = {"summary": summary, "nodes": nodes}
 
-    return st.session_state['agents_dict'], st.session_state['extra_info_dict']
+    return agents_dict, extra_info_dict
 
+# Your code block here...
 docs = load_documents(titles)
 agents_dict, extra_info_dict = asyncio.run(build_agents(docs))
 
-
-if 'all_tools' not in st.session_state:
-    # define tool for each document agent
-    st.session_state['all_tools'] = []
-    for file_base, agent in agents_dict.items():
-        summary = extra_info_dict[file_base]["summary"]
-        doc_tool = QueryEngineTool(
-            query_engine=agent,
-            metadata=ToolMetadata(
-                name=f"tool_{file_base}",
-                description=summary,
-            ),
-        )
-        st.session_state['all_tools'].append(doc_tool)
-
-    # Ensure that the tool names are correctly formatted and registered
-    for file_base, info in extra_info_dict.items():
-        if f"tool_{file_base}" not in [tool.metadata.name for tool in st.session_state['all_tools']]:
-            raise ValueError(f"Tool with name tool_{file_base} not found in the registered tools")
+all_tools = []
+for file_base, agent in agents_dict.items():
+    summary = extra_info_dict[file_base]["summary"]
+    doc_tool = QueryEngineTool(
+        query_engine=agent,
+        metadata=ToolMetadata(
+            name=f"tool_{file_base}",
+            description=summary,
+        ),
+    )
+    all_tools.append(doc_tool)
 
 llm = OpenAI(model_name="gpt-3.5-turbo")
 
-tool_mapping = SimpleToolNodeMapping.from_objects(st.session_state['all_tools'])
+tool_mapping = SimpleToolNodeMapping.from_objects(all_tools)
 obj_index = ObjectIndex.from_objects(
-    st.session_state['all_tools'],
+    all_tools,
     tool_mapping,
     VectorStoreIndex,
 )
 vector_node_retriever = obj_index.as_node_retriever(similarity_top_k=10)
+
+
+
+# Your Streamlit widget here...
 
 # define a custom retriever with reranking
 class CustomRetriever(BaseRetriever):
@@ -257,7 +251,7 @@ custom_node_retriever = CustomRetriever(vector_node_retriever)
 
 # wrap it with ObjectRetriever to return objects
 custom_obj_retriever = CustomObjectRetriever(
-    custom_node_retriever, tool_mapping, st.session_state['all_tools'], llm=llm
+    custom_node_retriever, tool_mapping, all_tools, llm=llm
 )
 
 top_agent = FnRetrieverOpenAIAgent.from_retriever(
@@ -341,7 +335,7 @@ def main():
 
 
     if 'agents_dict' not in st.session_state or 'extra_info_dict' not in st.session_state:
-        asyncio.run(build_agents(docs))
+        st.session_state['agents_dict'], st.session_state['extra_info_dict'] = asyncio.run(build_agents(docs))
 
     try:
         st.title("HIQA Inspection Reports Q&A")
@@ -377,9 +371,7 @@ def handle_input(conversation):
         st.session_state['processing'] = True
 
         prompt = ''
-        # Ensure that the top_agent is using the latest session state tools
-        top_agent.query_engine_tools = st.session_state['all_tools']
-        response = top_agent.query(user_input.strip())
+        response = top_agent.query(user_input)
         # print(response)
         answer = get_response_without_metadata(response)
 

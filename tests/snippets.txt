@@ -1,0 +1,61 @@
+
+
+    # Testing: Baseline vs. TopAgent
+
+    # # Define Baseline Vector Store Index
+    # base_index = VectorStoreIndex(all_nodes)
+    # base_query_engine = base_index.as_query_engine(similarity_top_k=4)
+
+    # question = 'Tell me about the inspection in Arigna House.'
+    #
+    # # should use Boston agent -> vector tool
+    # response = top_agent.query(question)
+    # print(f'top agent: {response}')
+    #
+    # # baseline
+    # response = base_query_engine.query(question)
+    # print(f'baseline: {str(response)}')
+
+    # # should use Houston agent -> vector tool
+    # response = top_agent.query(
+    #     "Give me a summary of all the positive aspects of Houston"
+    # )
+    # print(response)
+    #
+    # # baseline
+    # response = base_query_engine.query(
+    #     "Give me a summary of all the positive aspects of Houston"
+    # )
+    # print(str(response))0
+    #
+    # # baseline: the response doesn't quite match the sources...
+    # response.source_nodes[1].get_content()
+    #
+    # response = top_agent.query(
+    #     "Tell the demographics of Houston, and then compare that with the"
+    #     " demographics of Chicago"
+    # )
+    # print(response)
+    #
+    # # baseline
+    # response = base_query_engine.query(
+    #     "Tell the demographics of Houston, and then compare that with the"
+    #     " demographics of Chicago"
+    # )
+    # print(str(response))
+    #
+    # # baseline: the response tells you nothing about Chicago...
+    # response.source_nodes[3].get_content()
+    #
+    # response = top_agent.query(
+    #     "Tell me the differences between Shanghai and Beijing in terms of history"
+    #     " and current economy"
+    # )
+    # print(str(response))
+    #
+    # # baseline
+    # response = base_query_engine.query(
+    #     "Tell me the differences between Shanghai and Beijing in terms of history"
+    #     " and current economy"
+    # )
+    # print(str(response))

@@ -1,4 +1,5 @@
-.idea/
-.history/
-data/hiqa_pdfs/
+.idea
+.history
+data/
 .env
+.aider*
