@@ -351,6 +351,12 @@ def main():
             st.write(title)
         # Ensure the query is formed to consider all centres
         user_input = "List the names of all centres, their addresses, and the dates each centre has been inspected. Group dates by centre."
+        # Log the titles of all centres
+        st.write("All available centres:")
+        for title in wiki_titles:
+            st.write(title)
+        # Ensure the query is formed to consider all centres
+        user_input = "List the names of all centres, their addresses, and the dates each centre has been inspected. Group dates by centre."
 
     # Initialize tools and agents if not already done
     if 'agents_initialized' not in st.session_state:
