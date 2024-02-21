@@ -1,9 +1,7 @@
-import asyncio
 import os, json
 from pathlib import Path
 import streamlit as st
 from dotenv import load_dotenv, find_dotenv
-from streamlit import cache_data
 from llama_index.core import (
     VectorStoreIndex,
     SimpleKeywordTableIndex,
@@ -38,21 +36,21 @@ load_dotenv(find_dotenv(), override=True)
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 Settings.llm = OpenAI(temperature=0, model="gpt-3.5-turbo")
-Settings.embed_model = OpenAIEmbedding(model="text-embedding-3-large")
+Settings.embed_model = OpenAIEmbedding(model="text-embedding-ada-002")
 
-dir_path = 'data/hiqa_pdfs'
-persist_path = 'persist'
+dir_path = '../data/hiqa_pdfs'
+persist_path = '../persist'
 data_dir_path = Path(dir_path)
 llm = OpenAI(temperature=0, model='gpt-3.5-turbo')
 
-@cache_data
+@st.cache_data
 def get_wiki_titles():
     wiki_titles = []
     for file_path in data_dir_path.glob('*.pdf'):
         wiki_titles.append(file_path.stem)
     return wiki_titles
 
-@cache_data
+@st.cache_data
 def load_documents(wiki_titles):
     # reader = UnstructuredReader()
     city_docs = {}
@@ -74,14 +72,13 @@ def load_documents(wiki_titles):
             print(f"Failed to load document: {wiki_title}. Error: {str(e)}")
     return city_docs
 
-
+# @st.cache_data
 def build_agents(wiki_titles, _city_docs):
     node_parser = SentenceSplitter()
     agents = {}
     query_engines = {}
     all_nodes = []
     for idx, wiki_title in enumerate(wiki_titles):
-        documents = [doc_dict[wiki_title] for doc_dict in _city_docs if wiki_title in doc_dict]
         # nodes = node_parser.get_nodes_from_documents([city_docs[wiki_title]])
         documents = [doc_dict[wiki_title] for doc_dict in _city_docs if wiki_title in doc_dict]
         # nodes = node_parser.get_nodes_from_documents(documents)
@@ -90,7 +87,7 @@ def build_agents(wiki_titles, _city_docs):
         all_nodes.extend(nodes)
         vector_index, summary_index = build_indexes(wiki_title, nodes)
         query_engine_tools = define_tools(vector_index, summary_index, wiki_title)
-        agent = build_agent(query_engine_tools, wiki_title)
+        agent = build_agent(query_engine_tools, wiki_title, wiki_titles)
         agents[wiki_title] = agent
         query_engines[wiki_title] = vector_index.as_query_engine(similarity_top_k=2)
     return agents, query_engines
@@ -134,14 +131,56 @@ def define_tools(vector_index, summary_index, wiki_title):
     ]
     return query_engine_tools
 
-def build_agent(query_engine_tools, wiki_title):
+def build_agent(query_engine_tools, wiki_title, wiki_titles):
     system_prompt = f"""
-                    You have knowledge about the following documents: {wiki_title}.
-                    This document is an inspection report of disability centre {wiki_title}.
-                    The first page of a document contains the following information: Name of designated centre,
-                    Name of provider, Address of centre, Type of inspection, Date of inspection, and Centre ID.
+                    You are an AI expert in disability centre inspections, with a specialized focus on "The Health 
+                    Information and Quality Authority" (HIQA). HIQA is an independent authority established to drive 
+                    high-quality and safe care for people using our health and social care services in Ireland. HIQA’s 
+                    mandate to date extends across a specified range of public, private and voluntary sector services. 
+
+                    You have knowledge about the following documents:
+                    
+                    {wiki_titles}
+                    
+                    The first page of a document contains the following information:
+                        - Name of designated centre
+                        - Name of provider
+                        - Address of centre
+                        - Type of inspection
+                        - Date of inspection
+                        - Centre ID
+                        
+                    The document sections are:
+                        - About the designated centre
+                        - Number of residents on date of inspection
+                        - How we inspect
+                        - Date, Times of inspection, Inspector, Role
+                        - What residents told us and what inspectors observed
+                        - Capacity and capability
+                        - Several sections related to specific regulations and their corresponding inspection outcome (aka judgement)
+                        - Quality and safety
+                        - Appendix 1 - Full list of regulations considered under each dimension
+                        - Compliance Plan for the inspected centre
+                        - Compliance plan provider’s response
+                        - Summary of regulations to be complied with incl. Risk Rating and date to be complied with
+                        
+                        
+
+                    These documents are inspection reports of disability centres. 
+                    Reports may cover inspections at the same centre at different dates. 
+
+                    Ensure your responses are comprehensive and tailored for an audience knowledgeable 
+                    in the field. 
+
+                    You must ALWAYS use at least one of the tools provided when answering a question.
+                    
+                    If a question is not specific to a particular centre, you MUST include ALL
+                    centres in your response! 
+
+                    Do NOT rely on prior knowledge.
+                    
                     """
-    function_llm = OpenAI(temperature=0, model="gpt-3.5-turbo")
+    function_llm = OpenAI(model="gpt-3.5-turbo")
     agent = OpenAIAgent.from_tools(
         query_engine_tools,
         llm=function_llm,
@@ -150,7 +189,7 @@ def build_agent(query_engine_tools, wiki_title):
     )
     return agent
 
-
+# @st.cache_data
 def define_tool_for_each_document_agent(wiki_titles, _agents):
     all_tools = []
     for wiki_title in wiki_titles:
@@ -165,16 +204,12 @@ def define_tool_for_each_document_agent(wiki_titles, _agents):
                 description=wiki_summary,
             ),
         )
-        print(f"Tool created with name: {wiki_title}, description: {wiki_summary}")
         all_tools.append(doc_tool)
     return all_tools
 
+# @st.cache_data
 def define_object_index_and_retriever(all_tools):
     tool_mapping = SimpleToolNodeMapping.from_objects(all_tools)
-    registered_tools = [tool.metadata.name for tool in all_tools]
-    print(f"Tools registered in the index: {registered_tools}")
-    if "3363-loughtown-house-29-august-2023" not in registered_tools:
-        raise ValueError("Tool 3363-loughtown-house-29-august-2023 is not registered.")
     obj_index = ObjectIndex.from_objects(
         all_tools,
         tool_mapping,
@@ -207,20 +242,15 @@ class CustomObjectRetriever(ObjectRetriever):
         self._llm = llm or OpenAI("gpt-3.5-turbo")
 
     def retrieve(self, query_bundle):
-        print(f"Query bundle for retrieval: {query_bundle}")
         nodes = self._retriever.retrieve(query_bundle)
-        print(f"Retrieved nodes: {nodes}")
-        print(f"Raw retrieved nodes: {nodes}")
         tools = [self._object_node_mapping.from_node(n.node) for n in nodes]
-        print(f"Retrieved tools: {tools}")
 
         sub_question_engine = SubQuestionQueryEngine.from_defaults(
             query_engine_tools=tools, llm=self._llm
         )
         sub_question_description = f"""\
-                    for any queries that involve comparing multiple documents, or for queries that do NOT refer to a 
-                    specific centre, use THIS tool! 
-                    DO NOT USE the other tools for any queries involving multiple documents.
+Useful for any queries that involve comparing multiple documents. ALWAYS use this tool for comparison queries - make sure to call this \
+tool with the original query. Do NOT use the other tools for any queries involving multiple documents.
 """
         sub_question_tool = QueryEngineTool(
             query_engine=sub_question_engine,
@@ -256,52 +286,10 @@ custom_obj_retriever = CustomObjectRetriever(
 
 top_agent = FnRetrieverOpenAIAgent.from_retriever(
     custom_obj_retriever,
-    system_prompt=f""" 
-You are an AI expert in disability centre inspections, with a specialized focus on "The Health 
-Information and Quality Authority" (HIQA). HIQA is an independent authority established to drive 
-high-quality and safe care for people using our health and social care services in Ireland. HIQA’s 
-mandate to date extends across a specified range of public, private and voluntary sector services. 
+    system_prompt=""" \
+You are an agent designed to answer queries about the documentation.
+Please always use the tools provided to answer a question. Do not rely on prior knowledge.\
 
-You have knowledge about the following documents: 
-
-{wiki_titles}
-
-The first page of a document contains the following information:
-    - Name of designated centre
-    - Name of provider
-    - Address of centre
-    - Type of inspection
-    - Date of inspection
-    - Centre ID
-    
-The document sections are:
-    - About the designated centre
-    - Number of residents on date of inspection
-    - How we inspect
-    - Date, Times of inspection, Inspector, Role
-    - What residents told us and what inspectors observed
-    - Capacity and capability
-    - Several sections related to specific regulations and their corresponding inspection outcome (aka judgement)
-    - Quality and safety
-    - Appendix 1 - Full list of regulations considered under each dimension
-    - Compliance Plan for the inspected centre
-    - Compliance plan provider’s response
-    - Summary of regulations to be complied with incl. Risk Rating and date to be complied with
-    
-    
-
-These documents are inspection reports of disability centres. 
-Reports may cover inspections at the same centre at different dates. 
-
-Ensure your responses are comprehensive and tailored for an audience knowledgeable 
-in the field. 
-
-You must ALWAYS use at least one of the tools provided when answering a question.
-
-If a question is not specific to a particular centre, you MUST include ALL
-centres in your response! 
-
-Do NOT rely on prior knowledge. 
 """,
     llm=llm,
     verbose=True,
@@ -336,153 +324,25 @@ def main():
         st.session_state.conversation = []
 
     # Input for questions
-    user_input = st.text_input("Enter your question:", key='question_input', on_change=handle_input, args=(st.session_state.conversation,))
+    user_input = st.text_input("Enter your question:", key='question_input', on_change=handle_input,
+                               args=(st.session_state.conversation,))
 
     # Display conversation
     for speaker, text in st.session_state.conversation:
         st.write(f"{speaker}: {text}")
 
-    # Check if all centres are being considered
-    if user_input and user_input.lower().startswith("list the names of the centres"):
-    if user_input and user_input.lower().startswith("list the names of the centres"):
-        # Log the titles of all centres
-        st.write("All available centres:")
-        for title in wiki_titles:
-            st.write(title)
-        # Ensure the query is formed to consider all centres
-        user_input = "List the names of all centres, their addresses, and the dates each centre has been inspected. Group dates by centre."
-        # Log the titles of all centres
-        st.write("All available centres:")
-        for title in wiki_titles:
-            st.write(title)
-        # Ensure the query is formed to consider all centres
-        user_input = "List the names of all centres, their addresses, and the dates each centre has been inspected. Group dates by centre."
-
-    # Initialize tools and agents if not already done
-    if 'agents_initialized' not in st.session_state:
-        st.session_state.agents_initialized = initialize_agents_and_tools()
-        st.session_state.agents_initialized = True
-
-def initialize_agents_and_tools():
-    # This function will initialize all the necessary agents and tools
-    # and ensure they are ready before the user starts interacting with the system.
-    if 'agents_initialized' not in st.session_state:
-        st.session_state['agents_initialized'] = False
-
-    if not st.session_state['agents_initialized']:
-        wiki_titles = get_wiki_titles()
-        city_docs = load_documents(wiki_titles)
-        agents, query_engines = build_agents(wiki_titles, [city_docs])
-        all_tools = define_tool_for_each_document_agent(wiki_titles, agents)
-        vector_node_retriever = define_object_index_and_retriever(all_tools)
-        custom_node_retriever = CustomRetriever(vector_node_retriever)
-        tool_mapping = SimpleToolNodeMapping.from_objects(all_tools)
-        obj_index = ObjectIndex.from_objects(
-            all_tools,
-            tool_mapping,
-            VectorStoreIndex,
-        )
-        custom_obj_retriever = CustomObjectRetriever(
-            custom_node_retriever, tool_mapping, all_tools, llm=llm
-        )
-        top_agent = FnRetrieverOpenAIAgent.from_retriever(
-            custom_obj_retriever,
-            system_prompt=generate_system_prompt(wiki_titles),
-            llm=llm,
-            verbose=True,
-        )
-        st.session_state['agents_initialized'] = True
-        return True
-    return False
-
-def generate_system_prompt(wiki_titles):
-    return f""" 
-    You are an AI expert in disability centre inspections, with a specialized focus on "The Health 
-    Information and Quality Authority" (HIQA). HIQA is an independent authority established to drive 
-    high-quality and safe care for people using our health and social care services in Ireland. HIQA’s 
-    mandate to date extends across a specified range of public, private and voluntary sector services. 
-
-    You have knowledge about the following documents: 
-
-    {', '.join(wiki_titles)}
-
-    The first page of a document contains the following information:
-        - Name of designated centre
-        - Name of provider
-        - Address of centre
-        - Type of inspection
-        - Date of inspection
-        - Centre ID
-
-    The document sections are:
-        - About the designated centre
-        - Number of residents on date of inspection
-        - How we inspect
-        - Date, Times of inspection, Inspector, Role
-        - What residents told us and what inspectors observed
-        - Capacity and capability
-        - Several sections related to specific regulations and their corresponding inspection outcome (aka judgement)
-        - Quality and safety
-        - Appendix 1 - Full list of regulations considered under each dimension
-        - Compliance Plan for the inspected centre
-        - Compliance plan provider’s response
-        - Summary of regulations to be complied with incl. Risk Rating and date to be complied with
-
-    These documents are inspection reports of disability centres. 
-    Reports may cover inspections at the same centre at different dates. 
-
-    Ensure your responses are comprehensive and tailored for an audience knowledgeable 
-    in the field. 
-
-    You must ALWAYS use at least one of the tools provided when answering a question.
-
-    If a question is not specific to a particular centre, you MUST include ALL
-    centres in your response! 
-
-    Do NOT rely on prior knowledge. 
-    """
-
-def verify_tool_creation(all_tools):
-    # Check if all tools are created and registered
-    registered_tools = [tool.metadata.name for tool in all_tools]
-    if "3363-loughtown-house-29-august-2023" not in registered_tools:
-        raise ValueError("Tool 3363-loughtown-house-29-august-2023 is not registered.")
-    print("All tools are verified to be created and registered.")
 
 def handle_input(conversation):
-    user_input = st.session_state['question_input']
+    user_input = st.session_state.question_input
     if user_input:
         # Add question to conversation
         conversation.append(("You", user_input))
 
         prompt = ''
-        with st.spinner('Please wait...'):
-            # Check if the query mentions any known centre names
-            if not any(centre_name.lower() in user_input.lower() for centre_name in wiki_titles):
-                # Modify the query to include information about all centres
-                user_input = "Please provide information about all centres. " + user_input
-            print(f"Handling input: {user_input}")
-            response = top_agent.query(user_input)
-            try:
-                # Log the available tools before querying
-                available_tools = [tool.metadata.name for tool in all_tools]
-                print(f"Available tools: {available_tools}")
-                response = top_agent.query(user_input)
-                # Log the response for debugging
-                st.write("Response from the agent:")
-                st.write(response)
-            except ValueError as e:
-                # Log the error with more details
-                print(f"Error: {str(e)}. The tool may not be registered correctly.")
-                raise e
-            # Log the response for debugging
-            st.write("Response from the agent:")
-            st.write(response)
+        response = top_agent.query(user_input)
         # print(response)
         answer = get_response_without_metadata(response)
 
-        # Add answer to conversation
-        conversation.append(("AI", answer))
         # Save the question, the top answer, and the timestamp to a CSV file
         # with open('questions_answers.csv', 'a', newline='') as f:
         #     writer = csv.writer(f)
@@ -492,6 +352,70 @@ def handle_input(conversation):
 
         # Add answer to conversation
         conversation.append(("AI", answer))
+        # Clear input box
+        st.session_state.question_input = ""
 
 
-    return True
+if __name__ == "__main__":
+    main()
+
+
+    # Testing: Baseline vs. TopAgent
+
+    # # Define Baseline Vector Store Index
+    # base_index = VectorStoreIndex(all_nodes)
+    # base_query_engine = base_index.as_query_engine(similarity_top_k=4)
+
+    # question = 'Tell me about the inspection in Arigna House.'
+    #
+    # # should use Boston agent -> vector tool
+    # response = top_agent.query(question)
+    # print(f'top agent: {response}')
+    #
+    # # baseline
+    # response = base_query_engine.query(question)
+    # print(f'baseline: {str(response)}')
+
+    # # should use Houston agent -> vector tool
+    # response = top_agent.query(
+    #     "Give me a summary of all the positive aspects of Houston"
+    # )
+    # print(response)
+    #
+    # # baseline
+    # response = base_query_engine.query(
+    #     "Give me a summary of all the positive aspects of Houston"
+    # )
+    # print(str(response))0
+    #
+    # # baseline: the response doesn't quite match the sources...
+    # response.source_nodes[1].get_content()
+    #
+    # response = top_agent.query(
+    #     "Tell the demographics of Houston, and then compare that with the"
+    #     " demographics of Chicago"
+    # )
+    # print(response)
+    #
+    # # baseline
+    # response = base_query_engine.query(
+    #     "Tell the demographics of Houston, and then compare that with the"
+    #     " demographics of Chicago"
+    # )
+    # print(str(response))
+    #
+    # # baseline: the response tells you nothing about Chicago...
+    # response.source_nodes[3].get_content()
+    #
+    # response = top_agent.query(
+    #     "Tell me the differences between Shanghai and Beijing in terms of history"
+    #     " and current economy"
+    # )
+    # print(str(response))
+    #
+    # # baseline
+    # response = base_query_engine.query(
+    #     "Tell me the differences between Shanghai and Beijing in terms of history"
+    #     " and current economy"
+    # )
+    # print(str(response))
