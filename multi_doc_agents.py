@@ -36,10 +36,10 @@ load_dotenv(find_dotenv(), override=True)
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 Settings.llm = OpenAI(temperature=0, model="gpt-3.5-turbo")
-Settings.embed_model = OpenAIEmbedding(model="text-embedding-ada-002")
+Settings.embed_model = OpenAIEmbedding(model="text-embedding-3-large")
 
-dir_path = '../data/hiqa_pdfs'
-persist_path = '../persist'
+dir_path = 'data/hiqa_pdfs'
+persist_path = 'persist'
 data_dir_path = Path(dir_path)
 llm = OpenAI(temperature=0, model='gpt-3.5-turbo')
 
@@ -289,9 +289,51 @@ custom_obj_retriever = CustomObjectRetriever(
 top_agent = FnRetrieverOpenAIAgent.from_retriever(
     custom_obj_retriever,
     system_prompt=""" \
-You are an agent designed to answer queries about the documentation.
-Please always use the tools provided to answer a question. Do not rely on prior knowledge.\
+You are an AI expert in disability centre inspections, with a specialized focus on "The Health 
+                    Information and Quality Authority" (HIQA). HIQA is an independent authority established to drive 
+                    high-quality and safe care for people using our health and social care services in Ireland. HIQA’s 
+                    mandate to date extends across a specified range of public, private and voluntary sector services. 
 
+                    You have knowledge about the following documents:
+                    
+                    {wiki_titles}
+                    
+                    The first page of a document contains the following information:
+                        - Name of designated centre
+                        - Name of provider
+                        - Address of centre
+                        - Type of inspection
+                        - Date of inspection
+                        - Centre ID
+                        
+                    The document sections are:
+                        - About the designated centre
+                        - Number of residents on date of inspection
+                        - How we inspect
+                        - Date, Times of inspection, Inspector, Role
+                        - What residents told us and what inspectors observed
+                        - Capacity and capability
+                        - Several sections related to specific regulations and their corresponding inspection outcome (aka judgement)
+                        - Quality and safety
+                        - Appendix 1 - Full list of regulations considered under each dimension
+                        - Compliance Plan for the inspected centre
+                        - Compliance plan provider’s response
+                        - Summary of regulations to be complied with incl. Risk Rating and date to be complied with
+                        
+                        
+
+                    These documents are inspection reports of disability centres. 
+                    Reports may cover inspections at the same centre at different dates. 
+
+                    Ensure your responses are comprehensive and tailored for an audience knowledgeable 
+                    in the field. 
+
+                    You must ALWAYS use at least one of the tools provided when answering a question.
+                    
+                    If a question is not specific to a particular centre, you MUST include ALL
+                    centres in your response! 
+
+                    Do NOT rely on prior knowledge.
 """,
     llm=llm,
     verbose=True,
@@ -360,64 +402,3 @@ def handle_input(conversation):
 
 if __name__ == "__main__":
     main()
-
-
-    # Testing: Baseline vs. TopAgent
-
-    # # Define Baseline Vector Store Index
-    # base_index = VectorStoreIndex(all_nodes)
-    # base_query_engine = base_index.as_query_engine(similarity_top_k=4)
-
-    # question = 'Tell me about the inspection in Arigna House.'
-    #
-    # # should use Boston agent -> vector tool
-    # response = top_agent.query(question)
-    # print(f'top agent: {response}')
-    #
-    # # baseline
-    # response = base_query_engine.query(question)
-    # print(f'baseline: {str(response)}')
-
-    # # should use Houston agent -> vector tool
-    # response = top_agent.query(
-    #     "Give me a summary of all the positive aspects of Houston"
-    # )
-    # print(response)
-    #
-    # # baseline
-    # response = base_query_engine.query(
-    #     "Give me a summary of all the positive aspects of Houston"
-    # )
-    # print(str(response))0
-    #
-    # # baseline: the response doesn't quite match the sources...
-    # response.source_nodes[1].get_content()
-    #
-    # response = top_agent.query(
-    #     "Tell the demographics of Houston, and then compare that with the"
-    #     " demographics of Chicago"
-    # )
-    # print(response)
-    #
-    # # baseline
-    # response = base_query_engine.query(
-    #     "Tell the demographics of Houston, and then compare that with the"
-    #     " demographics of Chicago"
-    # )
-    # print(str(response))
-    #
-    # # baseline: the response tells you nothing about Chicago...
-    # response.source_nodes[3].get_content()
-    #
-    # response = top_agent.query(
-    #     "Tell me the differences between Shanghai and Beijing in terms of history"
-    #     " and current economy"
-    # )
-    # print(str(response))
-    #
-    # # baseline
-    # response = base_query_engine.query(
-    #     "Tell me the differences between Shanghai and Beijing in terms of history"
-    #     " and current economy"
-    # )
-    # print(str(response))
