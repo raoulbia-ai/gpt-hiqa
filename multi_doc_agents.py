@@ -41,80 +41,67 @@ Settings.embed_model = OpenAIEmbedding(model="text-embedding-3-large")
 dir_path = 'data/hiqa_pdfs'
 persist_path = 'persist'
 data_dir_path = Path(dir_path)
-llm = OpenAI(temperature=0, model='gpt-3.5-turbo')
 
-@st.cache_data
-def get_wiki_titles():
-    wiki_titles = []
-    for file_path in data_dir_path.glob('*.pdf'):
-        wiki_titles.append(file_path.stem)
-    return wiki_titles
 
-@st.cache_data
-def load_documents(wiki_titles):
-    # reader = UnstructuredReader()
-    city_docs = {}
-    for idx, wiki_title in enumerate(wiki_titles):
-        try:
-            # loaded_docs = reader.load_data(f"{dir_path}/{wiki_title}.pdf", split_documents=True)
-            # loaded_doc = Document(
-            #     text="\n\n".join([d.get_content() for d in loaded_docs]),
-            #     metadata={"path": str(wiki_title)},
-            # )
-            # city_docs[wiki_title] = loaded_doc
+wiki_titles = []
+for file_path in data_dir_path.glob('*.pdf'):
+    wiki_titles.append(file_path.stem)
 
-            city_docs[wiki_title] = SimpleDirectoryReader(
-                input_files=[f"{dir_path}/{wiki_title}.pdf"]
-            ).load_data()
 
-            print(f"Successfully loaded document: {wiki_title}")
-        except Exception as e:
-            print(f"Error creating sub-question tool 'compare_tool': {e}")
-            print(f"Failed to load document: {wiki_title}. Error: {str(e)}")
-    return city_docs
+city_docs = {}
+for idx, wiki_title in enumerate(wiki_titles):
+    try:
 
-# @st.cache_data
-def build_agents(wiki_titles, _city_docs):
-    node_parser = SentenceSplitter()
-    agents = {}
-    query_engines = {}
-    all_nodes = []
-    for idx, wiki_title in enumerate(wiki_titles):
-        # nodes = node_parser.get_nodes_from_documents([city_docs[wiki_title]])
-        documents = [doc_dict[wiki_title] for doc_dict in _city_docs if wiki_title in doc_dict]
-        # nodes = node_parser.get_nodes_from_documents(documents)
-        flat_documents = [doc for sublist in documents for doc in sublist]
-        nodes = node_parser.get_nodes_from_documents(flat_documents)
-        all_nodes.extend(nodes)
-        vector_index, summary_index = build_indexes(wiki_title, nodes)
-        query_engine_tools = define_tools(vector_index, summary_index, wiki_title)
-        agent = build_agent(query_engine_tools, wiki_title, wiki_titles)
-        agents[wiki_title] = agent
-        query_engines[wiki_title] = vector_index.as_query_engine(similarity_top_k=2)
-    return agents, query_engines
+        city_docs[wiki_title] = SimpleDirectoryReader(
+            input_files=[f"{dir_path}/{wiki_title}.pdf"]
+        ).load_data()
 
-def build_indexes(wiki_title, nodes):
-    if not os.path.exists(f"{persist_path}/{wiki_title}"):
+        print(f"Successfully loaded document: {wiki_title}")
+    except Exception as e:
+        print(f"Error creating sub-question tool 'compare_tool': {e}")
+        print(f"Failed to load document: {wiki_title}. Error: {str(e)}")
+
+
+node_parser = SentenceSplitter()
+
+# Build agents dictionary
+agents = {}
+query_engines = {}
+
+# this is for the baseline
+all_nodes = []
+
+for idx, wiki_title in enumerate(wiki_titles):
+    nodes = node_parser.get_nodes_from_documents(city_docs[wiki_title])
+    all_nodes.extend(nodes)
+
+    if not os.path.exists(f"./data/{wiki_title}"):
+        # build vector index
         vector_index = VectorStoreIndex(nodes)
-        vector_index.storage_context.persist(persist_dir=f"{persist_path}/{wiki_title}")
+        vector_index.storage_context.persist(
+            persist_dir=f"./data/{wiki_title}"
+        )
     else:
         vector_index = load_index_from_storage(
-            StorageContext.from_defaults(persist_dir=f"{persist_path}/{wiki_title}"),
+            StorageContext.from_defaults(persist_dir=f"./data/{wiki_title}"),
         )
+
+    # build summary index
     summary_index = SummaryIndex(nodes)
-    return vector_index, summary_index
-
-def define_tools(vector_index, summary_index, wiki_title):
-
+    # define query engines
     vector_query_engine = vector_index.as_query_engine(llm=llm)
     summary_query_engine = summary_index.as_query_engine(llm=llm)
+
+    # define tools
     query_engine_tools = [
         QueryEngineTool(
             query_engine=vector_query_engine,
             metadata=ToolMetadata(
                 name="vector_tool",
                 description=(
-                    f"""Useful for questions related to the inspection of centre {wiki_title}"""
+                    "Useful for questions related to specific aspects of"
+                    f" {wiki_title} (e.g. the history, arts and culture,"
+                    " sports, demographics, or more)."
                 ),
             ),
         ),
@@ -123,102 +110,56 @@ def define_tools(vector_index, summary_index, wiki_title):
             metadata=ToolMetadata(
                 name="summary_tool",
                 description=(
-                    f"""Useful for any requests that require a holistic summary
-                        of EVERYTHING about centre {wiki_title}. For questions about
-                        more specific sections, please use the vector_tool."""
+                    "Useful for any requests that require a holistic summary"
+                    f" of EVERYTHING about {wiki_title}. For questions about"
+                    " more specific sections, please use the vector_tool."
                 ),
             ),
         ),
     ]
-    return query_engine_tools
 
-def build_agent(query_engine_tools, wiki_title, wiki_titles):
-    system_prompt = f"""
-                    You are an AI expert in disability centre inspections, with a specialized focus on "The Health 
-                    Information and Quality Authority" (HIQA). HIQA is an independent authority established to drive 
-                    high-quality and safe care for people using our health and social care services in Ireland. HIQA’s 
-                    mandate to date extends across a specified range of public, private and voluntary sector services. 
-
-                    You have knowledge about the following documents:
-                    
-                    {wiki_titles}
-                    
-                    The first page of a document contains the following information:
-                        - Name of designated centre
-                        - Name of provider
-                        - Address of centre
-                        - Type of inspection
-                        - Date of inspection
-                        - Centre ID
-                        
-                    The document sections are:
-                        - About the designated centre
-                        - Number of residents on date of inspection
-                        - How we inspect
-                        - Date, Times of inspection, Inspector, Role
-                        - What residents told us and what inspectors observed
-                        - Capacity and capability
-                        - Several sections related to specific regulations and their corresponding inspection outcome (aka judgement)
-                        - Quality and safety
-                        - Appendix 1 - Full list of regulations considered under each dimension
-                        - Compliance Plan for the inspected centre
-                        - Compliance plan provider’s response
-                        - Summary of regulations to be complied with incl. Risk Rating and date to be complied with
-                        
-                        
-
-                    These documents are inspection reports of disability centres. 
-                    Reports may cover inspections at the same centre at different dates. 
-
-                    Ensure your responses are comprehensive and tailored for an audience knowledgeable 
-                    in the field. 
-
-                    You must ALWAYS use at least one of the tools provided when answering a question.
-                    
-                    If a question is not specific to a particular centre, you MUST include ALL
-                    centres in your response! 
-
-                    Do NOT rely on prior knowledge.
-                    
-                    """
-    function_llm = OpenAI(model="gpt-3.5-turbo")
+    # build agent
+    function_llm = OpenAI(model="gpt-4")
     agent = OpenAIAgent.from_tools(
         query_engine_tools,
         llm=function_llm,
         verbose=True,
-        system_prompt=system_prompt
+        system_prompt=f"""\
+You are a specialized agent designed to answer queries about {wiki_title}.
+You must ALWAYS use at least one of the tools provided when answering a question; do NOT rely on prior knowledge.\
+""",
     )
-    return agent
 
-# @st.cache_data
-def define_tool_for_each_document_agent(wiki_titles, _agents):
-    all_tools = []
-    for wiki_title in wiki_titles:
-        wiki_summary = (
-            f"This content is an inspection report about {wiki_title}. Use"
-            f" this tool if you want to answer any questions about {wiki_title}.\n"
-        )
-        doc_tool = QueryEngineTool(
-            query_engine=_agents[wiki_title],
-            metadata=ToolMetadata(
-                name=f"{wiki_title}",
-                description=wiki_summary,
-            ),
-        )
-        all_tools.append(doc_tool)
-    return all_tools
-
-# @st.cache_data
-def define_object_index_and_retriever(all_tools):
-    tool_mapping = SimpleToolNodeMapping.from_objects(all_tools)
-    obj_index = ObjectIndex.from_objects(
-        all_tools,
-        tool_mapping,
-        VectorStoreIndex,
+    agents[wiki_title] = agent
+    query_engines[wiki_title] = vector_index.as_query_engine(
+        similarity_top_k=2
     )
-    vector_node_retriever = obj_index.as_node_retriever(similarity_top_k=10)
-    return vector_node_retriever
 
+# define tool for each document agent
+all_tools = []
+for wiki_title in wiki_titles:
+    wiki_summary = (
+        f"This content contains Wikipedia articles about {wiki_title}. Use"
+        f" this tool if you want to answer any questions about {wiki_title}.\n"
+    )
+    doc_tool = QueryEngineTool(
+        query_engine=agents[wiki_title],
+        metadata=ToolMetadata(
+            name=f"tool_{wiki_title}",
+            description=wiki_summary,
+        ),
+    )
+    all_tools.append(doc_tool)
+
+llm = OpenAI(temperature=0, model='gpt-4-0613')
+
+tool_mapping = SimpleToolNodeMapping.from_objects(all_tools)
+obj_index = ObjectIndex.from_objects(
+    all_tools,
+    tool_mapping,
+    VectorStoreIndex,
+)
+vector_node_retriever = obj_index.as_node_retriever(similarity_top_k=10)
 
 # define a custom retriever with reranking
 class CustomRetriever(BaseRetriever):
@@ -235,6 +176,7 @@ class CustomRetriever(BaseRetriever):
 
         return filtered_nodes
 
+
 # define a custom object retriever that adds in a query planning tool
 class CustomObjectRetriever(ObjectRetriever):
     def __init__(self, retriever, object_node_mapping, all_tools, llm=None):
@@ -250,9 +192,9 @@ class CustomObjectRetriever(ObjectRetriever):
             query_engine_tools=tools, llm=self._llm
         )
         sub_question_description = f"""\
-Useful for any queries that involve comparing multiple documents. ALWAYS use this tool for comparison queries - make sure to call this \
-tool with the original query. Do NOT use the other tools for any queries involving multiple documents.
-"""
+                Useful for any queries that involve comparing multiple documents. ALWAYS use this tool for comparison queries - make sure to call this \
+                tool with the original query. Do NOT use the other tools for any queries involving multiple documents.
+                """
         sub_question_tool = QueryEngineTool(
             query_engine=sub_question_engine,
             metadata=ToolMetadata(
@@ -263,40 +205,25 @@ tool with the original query. Do NOT use the other tools for any queries involvi
         return tools + [sub_question_tool]
     
 
-wiki_titles = get_wiki_titles()
-city_docs = load_documents(wiki_titles)
-agents, query_engines = build_agents(wiki_titles, [city_docs])
-all_tools = define_tool_for_each_document_agent(wiki_titles, agents)
-vector_node_retriever = define_object_index_and_retriever(all_tools)
 
 custom_node_retriever = CustomRetriever(vector_node_retriever)
-
-# wrap it with ObjectRetriever to return objects
-tool_mapping = SimpleToolNodeMapping.from_objects(all_tools)
-obj_index = ObjectIndex.from_objects(
-    all_tools,
-    tool_mapping,
-    VectorStoreIndex,
-)
 
 custom_obj_retriever = CustomObjectRetriever(
     custom_node_retriever, tool_mapping, all_tools, llm=llm
 )
 
-
-
 top_agent = FnRetrieverOpenAIAgent.from_retriever(
     custom_obj_retriever,
-    system_prompt=""" \
+    system_prompt=""" 
 You are an AI expert in disability centre inspections, with a specialized focus on "The Health 
                     Information and Quality Authority" (HIQA). HIQA is an independent authority established to drive 
                     high-quality and safe care for people using our health and social care services in Ireland. HIQA’s 
                     mandate to date extends across a specified range of public, private and voluntary sector services. 
 
                     You have knowledge about the following documents:
-                    
+
                     {wiki_titles}
-                    
+
                     The first page of a document contains the following information:
                         - Name of designated centre
                         - Name of provider
@@ -304,7 +231,7 @@ You are an AI expert in disability centre inspections, with a specialized focus 
                         - Type of inspection
                         - Date of inspection
                         - Centre ID
-                        
+
                     The document sections are:
                         - About the designated centre
                         - Number of residents on date of inspection
@@ -318,8 +245,8 @@ You are an AI expert in disability centre inspections, with a specialized focus 
                         - Compliance Plan for the inspected centre
                         - Compliance plan provider’s response
                         - Summary of regulations to be complied with incl. Risk Rating and date to be complied with
-                        
-                        
+
+
 
                     These documents are inspection reports of disability centres. 
                     Reports may cover inspections at the same centre at different dates. 
@@ -328,7 +255,7 @@ You are an AI expert in disability centre inspections, with a specialized focus 
                     in the field. 
 
                     You must ALWAYS use at least one of the tools provided when answering a question.
-                    
+
                     If a question is not specific to a particular centre, you MUST include ALL
                     centres in your response! 
 
@@ -337,6 +264,9 @@ You are an AI expert in disability centre inspections, with a specialized focus 
     llm=llm,
     verbose=True,
 )
+
+
+
 
 
 # Function to get the session state
@@ -389,18 +319,11 @@ def handle_input(conversation):
         answer = get_response_without_metadata(response)
 
         if 'processing' in st.session_state and not st.session_state['processing']:
-        # Save the question, the top answer, and the timestamp to a CSV file
-        # with open('questions_answers.csv', 'a', newline='') as f:
-        #     writer = csv.writer(f)
-        #     # Write the question, the top answer, and the timestamp to the CSV file
-        #     # Assuming reranked_results[0] is the top answer
-        #     writer.writerow([user_input, answer])
-
-        # Add answer to conversation
-        conversation.append(("AI", answer))
-        # Clear input box
-        st.session_state['processing'] = False
-        st.session_state.question_input = ""
+            # Add answer to conversation
+            conversation.append(("AI", answer))
+            # Clear input box
+            st.session_state['processing'] = False
+            st.session_state.question_input = ""
 
 
 if __name__ == "__main__":
