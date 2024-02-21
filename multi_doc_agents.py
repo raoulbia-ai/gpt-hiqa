@@ -338,6 +338,14 @@ async def main():
     for speaker, text in st.session_state.conversation:
         st.write(f"{speaker}: {text}")
 
+    # Check if all centres are being considered
+    if user_input.lower().startswith("list the names of the centres"):
+        # Log the titles of all centres
+        st.write("All available centres:")
+        for title in wiki_titles:
+            st.write(title)
+        # Ensure the query is formed to consider all centres
+        user_input = "List the names of all centres, their addresses, and the dates each centre has been inspected. Group dates by centre."
 
 def handle_input(conversation):
     user_input = st.session_state['question_input']
@@ -348,6 +356,9 @@ def handle_input(conversation):
         prompt = ''
         with st.spinner('Please wait...'):
             response = top_agent.query(user_input)
+            # Log the response for debugging
+            st.write("Response from the agent:")
+            st.write(response)
         # print(response)
         answer = get_response_without_metadata(response)
 
