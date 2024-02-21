@@ -1,5 +1,6 @@
 import os, json
 from pathlib import Path
+from streamlit import caching
 import streamlit as st
 from dotenv import load_dotenv, find_dotenv
 from llama_index.core import (
@@ -48,18 +49,20 @@ for file_path in data_dir_path.glob('*.pdf'):
     wiki_titles.append(file_path.stem)
 
 
-city_docs = {}
-for idx, wiki_title in enumerate(wiki_titles):
-    try:
+@st.experimental_singleton
+def load_documents(wiki_titles):
+    city_docs = {}
+    for idx, wiki_title in enumerate(wiki_titles):
+        try:
+            city_docs[wiki_title] = SimpleDirectoryReader(
+                input_files=[f"{dir_path}/{wiki_title}.pdf"]
+            ).load_data()
+            print(f"Successfully loaded document: {wiki_title}")
+        except Exception as e:
+            print(f"Error loading document: {wiki_title}. Error: {str(e)}")
+    return city_docs
 
-        city_docs[wiki_title] = SimpleDirectoryReader(
-            input_files=[f"{dir_path}/{wiki_title}.pdf"]
-        ).load_data()
-
-        print(f"Successfully loaded document: {wiki_title}")
-    except Exception as e:
-        print(f"Error creating sub-question tool 'compare_tool': {e}")
-        print(f"Failed to load document: {wiki_title}. Error: {str(e)}")
+city_docs = load_documents(wiki_titles)
 
 
 node_parser = SentenceSplitter()
@@ -288,6 +291,9 @@ def get_response_without_metadata(response):
 
 
 def main():
+    # Clear cache if needed
+    # caching.clear_cache()
+
     st.title("HIQA Inspection Reports Q&A")
     st.write("""Proof of Concept ChatGPT Application trained on inspection reports for 
         disability centers in Leitrim.""")
