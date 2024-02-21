@@ -3,7 +3,7 @@ import os, json
 from pathlib import Path
 import streamlit as st
 from dotenv import load_dotenv, find_dotenv
-from streamlit import cache
+from streamlit import cache_data
 from llama_index.core import (
     VectorStoreIndex,
     SimpleKeywordTableIndex,
@@ -45,14 +45,14 @@ persist_path = 'persist'
 data_dir_path = Path(dir_path)
 llm = OpenAI(temperature=0, model='gpt-3.5-turbo')
 
-@cache
+@cache_data
 def get_wiki_titles():
     wiki_titles = []
     for file_path in data_dir_path.glob('*.pdf'):
         wiki_titles.append(file_path.stem)
     return wiki_titles
 
-@cache
+@cache_data
 def load_documents(wiki_titles):
     # reader = UnstructuredReader()
     city_docs = {}
@@ -74,7 +74,7 @@ def load_documents(wiki_titles):
             print(f"Failed to load document: {wiki_title}. Error: {str(e)}")
     return city_docs
 
-# @cache
+@cache_data
 def build_agents(wiki_titles, _city_docs):
     node_parser = SentenceSplitter()
     agents = {}
@@ -149,7 +149,7 @@ def build_agent(query_engine_tools, wiki_title, wiki_titles):
     )
     return agent
 
-# @cache
+@cache_data
 def define_tool_for_each_document_agent(wiki_titles, _agents):
     all_tools = []
     for wiki_title in wiki_titles:
@@ -168,7 +168,7 @@ def define_tool_for_each_document_agent(wiki_titles, _agents):
         all_tools.append(doc_tool)
     return all_tools
 
-# @cache
+@cache_data
 def define_object_index_and_retriever(all_tools):
     tool_mapping = SimpleToolNodeMapping.from_objects(all_tools)
     registered_tools = [tool.metadata.name for tool in all_tools]
