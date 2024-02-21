@@ -169,6 +169,7 @@ async def build_agents(docs):
 
     return agents_dict, extra_info_dict
 
+ agents_dict, extra_info_dict = asyncio.run(build_agents(docs))
 
 agents_dict, extra_info_dict = await build_agents(docs)
 
@@ -244,4 +245,4 @@ def handle_input(conversation):
 
 
 # if __name__ == "__main__":
-#     main()
+#     asyncio.run(main())
