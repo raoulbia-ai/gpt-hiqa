@@ -3,6 +3,7 @@ import os, json
 from pathlib import Path
 import streamlit as st
 from dotenv import load_dotenv, find_dotenv
+from streamlit import cache
 from llama_index.core import (
     VectorStoreIndex,
     SimpleKeywordTableIndex,
@@ -44,14 +45,14 @@ persist_path = 'persist'
 data_dir_path = Path(dir_path)
 llm = OpenAI(temperature=0, model='gpt-3.5-turbo')
 
-@st.cache_data
+@cache
 def get_wiki_titles():
     wiki_titles = []
     for file_path in data_dir_path.glob('*.pdf'):
         wiki_titles.append(file_path.stem)
     return wiki_titles
 
-@st.cache_data
+@cache
 def load_documents(wiki_titles):
     # reader = UnstructuredReader()
     city_docs = {}
@@ -73,7 +74,7 @@ def load_documents(wiki_titles):
             print(f"Failed to load document: {wiki_title}. Error: {str(e)}")
     return city_docs
 
-# @st.cache_data
+# @cache
 def build_agents(wiki_titles, _city_docs):
     node_parser = SentenceSplitter()
     agents = {}
@@ -148,7 +149,7 @@ def build_agent(query_engine_tools, wiki_title, wiki_titles):
     )
     return agent
 
-# @st.cache_data
+# @cache
 def define_tool_for_each_document_agent(wiki_titles, _agents):
     all_tools = []
     for wiki_title in wiki_titles:
@@ -167,7 +168,7 @@ def define_tool_for_each_document_agent(wiki_titles, _agents):
         all_tools.append(doc_tool)
     return all_tools
 
-# @st.cache_data
+# @cache
 def define_object_index_and_retriever(all_tools):
     tool_mapping = SimpleToolNodeMapping.from_objects(all_tools)
     registered_tools = [tool.metadata.name for tool in all_tools]
@@ -325,7 +326,7 @@ def get_response_without_metadata(response):
     return response  # response['choices'][0]['text']
 
 
-async def main():
+def main():
     st.title("HIQA Inspection Reports Q&A")
     st.write("""Proof of Concept ChatGPT Application trained on inspection reports for 
         disability centers in Leitrim.""")
@@ -352,10 +353,10 @@ async def main():
 
     # Initialize tools and agents if not already done
     if 'agents_initialized' not in st.session_state:
-        initialize_agents_and_tools()
+        st.session_state.agents_initialized = initialize_agents_and_tools()
         st.session_state.agents_initialized = True
 
-def initialize_agents_and_tools():
+def initialize_agents_and_tools() -> bool:
     # This function will initialize all the necessary agents and tools
     # and ensure they are ready before the user starts interacting with the system.
     global wiki_titles, city_docs, agents, query_engines, all_tools, vector_node_retriever, custom_node_retriever, tool_mapping, obj_index, custom_obj_retriever, top_agent
@@ -481,9 +482,4 @@ def handle_input(conversation):
         conversation.append(("AI", answer))
 
 
-if __name__ == "__main__":
-    # Ensure all initialization is done before starting the Streamlit app
-    initialize_agents_and_tools()
-    st.session_state.agents_initialized = True
-    asyncio.run(main())
-    # main()
+    return True
