@@ -381,6 +381,8 @@ def handle_input(conversation):
         # Add question to conversation
         conversation.append(("You", user_input))
 
+        st.session_state['processing'] = True
+
         prompt = ''
         response = top_agent.query(user_input)
         # print(response)
@@ -396,6 +398,9 @@ def handle_input(conversation):
         # Add answer to conversation
         conversation.append(("AI", answer))
         # Clear input box
+        st.session_state['processing'] = False
+
+    if 'processing' in st.session_state and not st.session_state['processing']:
         st.session_state.question_input = ""
 
 
