@@ -361,10 +361,5 @@ async def handle_input(conversation):
 
 
 if __name__ == "__main__":
-    if st._is_running_with_streamlit:
-        main_coroutine = main()
-        asyncio.run(main_coroutine)
-    else:
-        # Fallback in case we're not running within Streamlit
-        asyncio.run(main())
+    asyncio.run(main())
     # main()
