@@ -302,6 +302,7 @@ def main():
         st.session_state.city_docs_loaded = True
 
 
+    try:
     st.title("HIQA Inspection Reports Q&A")
     st.write("""Proof of Concept ChatGPT Application trained on inspection reports for 
         disability centers in Leitrim.""")
@@ -318,6 +319,9 @@ def main():
     for speaker, text in st.session_state.conversation:
         st.write(f"{speaker}: {text}")
 
+    except Exception as e:
+        st.error(f"An error occurred: {e}")
+        st.stop()
 
 def handle_input(conversation):
     user_input = st.session_state.question_input
