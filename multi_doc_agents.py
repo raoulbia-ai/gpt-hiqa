@@ -283,6 +283,10 @@ def get_response_without_metadata(response):
     return response  # response['choices'][0]['text']
 
 
+@st.cache(allow_output_mutation=True, hash_funcs={asyncio.base_events._RunningLoop: id})
+async def build_agents(docs):
+    return await build_agents(docs)
+
 def main():
     # Clear cache if needed
     # caching.clear_cache()
@@ -290,6 +294,9 @@ def main():
     # Load documents if not already loaded
     # This block is redundant as the loading is handled above and should be removed
 
+
+    if 'agents_dict' not in st.session_state or 'extra_info_dict' not in st.session_state:
+        st.session_state['agents_dict'], st.session_state['extra_info_dict'] = asyncio.run(build_agents(docs))
 
     try:
         st.title("HIQA Inspection Reports Q&A")
@@ -307,6 +314,10 @@ def main():
         # Display conversation
         for speaker, text in st.session_state.conversation:
             st.write(f"{speaker}: {text}")
+
+        # Use the cached agents and extra info from the session state
+        agents_dict = st.session_state['agents_dict']
+        extra_info_dict = st.session_state['extra_info_dict']
 
     except Exception as e:
         st.error(f"An error occurred: {e}")
