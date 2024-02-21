@@ -359,10 +359,12 @@ def main():
 def initialize_agents_and_tools() -> bool:
     # This function will initialize all the necessary agents and tools
     # and ensure they are ready before the user starts interacting with the system.
-    global wiki_titles, city_docs, agents, query_engines, all_tools, vector_node_retriever, custom_node_retriever, tool_mapping, obj_index, custom_obj_retriever, top_agent
-    wiki_titles = get_wiki_titles()
-    city_docs = load_documents(wiki_titles)
-    agents, query_engines = build_agents(wiki_titles, [city_docs])
+    global agents, query_engines, all_tools, vector_node_retriever, custom_node_retriever, tool_mapping, obj_index, custom_obj_retriever, top_agent
+    # Ensure documents are loaded before building agents
+    if 'city_docs' not in st.session_state or 'wiki_titles' not in st.session_state:
+        st.session_state.wiki_titles = get_wiki_titles()
+        st.session_state.city_docs = load_documents(st.session_state.wiki_titles)
+    agents, query_engines = build_agents(st.session_state.wiki_titles, [st.session_state.city_docs])
     all_tools = define_tool_for_each_document_agent(wiki_titles, agents)
     # Ensure all tools are created and registered before proceeding
     verify_tool_creation(all_tools)
