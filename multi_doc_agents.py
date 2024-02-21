@@ -49,7 +49,7 @@ data_dir_path = Path(dir_path)
 llm = OpenAI(temperature=0, model='gpt-3.5-turbo')
 
 titles = []
-for file_path in dir_path.glob('*.pdf'):
+for file_path in data_dir_path.glob('*.pdf'):
     titles.append(file_path.stem)
 
 
@@ -169,9 +169,10 @@ async def build_agents(docs):
 
     return agents_dict, extra_info_dict
 
- agents_dict, extra_info_dict = asyncio.run(build_agents(docs))
 
-agents_dict, extra_info_dict = await build_agents(docs)
+agents_dict, extra_info_dict = asyncio.run(build_agents(docs))
+
+
 
 
 # Function to get the session state
