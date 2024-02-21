@@ -1,6 +1,6 @@
 import os, json
 from pathlib import Path
-from streamlit import caching
+# from streamlit import caching
 import streamlit as st
 from dotenv import load_dotenv, find_dotenv
 from llama_index.core import (
@@ -43,13 +43,14 @@ dir_path = 'data/hiqa_pdfs'
 persist_path = 'persist'
 data_dir_path = Path(dir_path)
 
+llm = OpenAI(temperature=0, model='gpt-4-0613')
 
 wiki_titles = []
 for file_path in data_dir_path.glob('*.pdf'):
     wiki_titles.append(file_path.stem)
 
 
-@st.experimental_singleton
+@st.cache_resource
 def load_documents(wiki_titles):
     city_docs = {}
     for idx, wiki_title in enumerate(wiki_titles):
@@ -62,13 +63,11 @@ def load_documents(wiki_titles):
             print(f"Error loading document: {wiki_title}. Error: {str(e)}")
     return city_docs
 
-city_docs = load_documents(wiki_titles)
-
 
 node_parser = SentenceSplitter()
 
 if 'city_docs_loaded' not in st.session_state:
-    st.session_state.city_docs = city_docs
+    st.session_state.city_docs = load_documents(wiki_titles)
     st.session_state.city_docs_loaded = True
 city_docs = st.session_state.city_docs
 
@@ -158,8 +157,6 @@ for wiki_title in wiki_titles:
         ),
     )
     all_tools.append(doc_tool)
-
-llm = OpenAI(temperature=0, model='gpt-4-0613')
 
 tool_mapping = SimpleToolNodeMapping.from_objects(all_tools)
 obj_index = ObjectIndex.from_objects(
