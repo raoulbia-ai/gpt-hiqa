@@ -196,7 +196,12 @@ class CustomObjectRetriever(ObjectRetriever):
         sub_question_engine = SubQuestionQueryEngine.from_defaults(
             query_engine_tools=tools, llm=self._llm
         )
-        sub_question_description = f"""\
+        sub_question_description = (
+            "Useful for any queries that involve comparing multiple documents. "
+            "ALWAYS use this tool for comparison queries - make sure to call this "
+            "tool with the original query. Do NOT use the other tools for any queries "
+            "involving multiple documents."
+        )
                 Useful for any queries that involve comparing multiple documents. ALWAYS use this tool for comparison queries - make sure to call this \
                 tool with the original query. Do NOT use the other tools for any queries involving multiple documents.
                 """
