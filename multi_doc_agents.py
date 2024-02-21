@@ -43,7 +43,7 @@ dir_path = 'data/hiqa_pdfs'
 persist_path = 'persist'
 data_dir_path = Path(dir_path)
 
-llm = OpenAI(temperature=0, model='gpt-4-0613')
+llm = OpenAI(temperature=0, model='gpt-3.5-turbo')
 
 wiki_titles = []
 for file_path in data_dir_path.glob('*.pdf'):
@@ -303,21 +303,21 @@ def main():
 
 
     try:
-    st.title("HIQA Inspection Reports Q&A")
-    st.write("""Proof of Concept ChatGPT Application trained on inspection reports for 
-        disability centers in Leitrim.""")
+        st.title("HIQA Inspection Reports Q&A")
+        st.write("""Proof of Concept ChatGPT Application trained on inspection reports for 
+            disability centers in Leitrim.""")
 
-    # Session state to store conversation history
-    if 'conversation' not in st.session_state:
-        st.session_state.conversation = []
+        # Session state to store conversation history
+        if 'conversation' not in st.session_state:
+            st.session_state.conversation = []
 
-    # Input for questions
-    user_input = st.text_input("Enter your question:", key='question_input', on_change=handle_input,
-                               args=(st.session_state.conversation,))
+        # Input for questions
+        user_input = st.text_input("Enter your question:", key='question_input', on_change=handle_input,
+                                   args=(st.session_state.conversation,))
 
-    # Display conversation
-    for speaker, text in st.session_state.conversation:
-        st.write(f"{speaker}: {text}")
+        # Display conversation
+        for speaker, text in st.session_state.conversation:
+            st.write(f"{speaker}: {text}")
 
     except Exception as e:
         st.error(f"An error occurred: {e}")
