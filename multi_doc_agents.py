@@ -68,7 +68,9 @@ def load_documents(wiki_titles):
             ).load_data()
 
             print(f"Successfully loaded document: {wiki_title}")
+            print(f"Sub-question tool 'compare_tool' created successfully with description: {sub_question_description}")
         except Exception as e:
+            print(f"Error creating sub-question tool 'compare_tool': {e}")
             print(f"Failed to load document: {wiki_title}. Error: {str(e)}")
     return city_docs
 
