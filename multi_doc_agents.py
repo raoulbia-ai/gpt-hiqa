@@ -363,6 +363,8 @@ def initialize_agents_and_tools():
     city_docs = load_documents(wiki_titles)
     agents, query_engines = build_agents(wiki_titles, [city_docs])
     all_tools = define_tool_for_each_document_agent(wiki_titles, agents)
+    # Ensure all tools are created and registered before proceeding
+    verify_tool_creation(all_tools)
     vector_node_retriever = define_object_index_and_retriever(all_tools)
     custom_node_retriever = CustomRetriever(vector_node_retriever)
     tool_mapping = SimpleToolNodeMapping.from_objects(all_tools)
@@ -426,6 +428,13 @@ def initialize_agents_and_tools():
         llm=llm,
         verbose=True,
     )
+
+def verify_tool_creation(all_tools):
+    # Check if all tools are created and registered
+    registered_tools = [tool.metadata.name for tool in all_tools]
+    if "3363-loughtown-house-29-august-2023" not in registered_tools:
+        raise ValueError("Tool 3363-loughtown-house-29-august-2023 is not registered.")
+    print("All tools are verified to be created and registered.")
 
 def handle_input(conversation):
     user_input = st.session_state['question_input']
