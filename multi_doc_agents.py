@@ -67,6 +67,11 @@ city_docs = load_documents(wiki_titles)
 
 node_parser = SentenceSplitter()
 
+if 'city_docs_loaded' not in st.session_state:
+    st.session_state.city_docs = load_documents(wiki_titles)
+    st.session_state.city_docs_loaded = True
+city_docs = st.session_state.city_docs
+
 # Build agents dictionary
 agents = {}
 query_engines = {}
@@ -293,6 +298,12 @@ def get_response_without_metadata(response):
 def main():
     # Clear cache if needed
     # caching.clear_cache()
+
+    # Load documents if not already loaded
+    if 'city_docs_loaded' not in st.session_state:
+        st.session_state.city_docs = load_documents(wiki_titles)
+        st.session_state.city_docs_loaded = True
+
 
     st.title("HIQA Inspection Reports Q&A")
     st.write("""Proof of Concept ChatGPT Application trained on inspection reports for 
