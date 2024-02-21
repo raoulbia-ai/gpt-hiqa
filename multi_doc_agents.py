@@ -163,14 +163,17 @@ def define_tool_for_each_document_agent(wiki_titles, _agents):
                 description=wiki_summary,
             ),
         )
-        print(f"Tool created with name: {wiki_title}")
+        print(f"Tool created with name: {wiki_title}, description: {wiki_summary}")
         all_tools.append(doc_tool)
     return all_tools
 
 # @st.cache_data
 def define_object_index_and_retriever(all_tools):
     tool_mapping = SimpleToolNodeMapping.from_objects(all_tools)
-    print(f"Tools registered in the index: {[tool.metadata.name for tool in all_tools]}")
+    registered_tools = [tool.metadata.name for tool in all_tools]
+    print(f"Tools registered in the index: {registered_tools}")
+    if "3363-loughtown-house-29-august-2023" not in registered_tools:
+        raise ValueError("Tool 3363-loughtown-house-29-august-2023 is not registered.")
     obj_index = ObjectIndex.from_objects(
         all_tools,
         tool_mapping,
@@ -436,6 +439,7 @@ def handle_input(conversation):
             if not any(centre_name.lower() in user_input.lower() for centre_name in wiki_titles):
                 # Modify the query to include information about all centres
                 user_input = "Please provide information about all centres. " + user_input
+            print(f"Handling input: {user_input}")
             response = top_agent.query(user_input)
             # Log the response for debugging
             st.write("Response from the agent:")
@@ -443,6 +447,8 @@ def handle_input(conversation):
         # print(response)
         answer = get_response_without_metadata(response)
 
+        # Add answer to conversation
+        conversation.append(("AI", answer))
         # Save the question, the top answer, and the timestamp to a CSV file
         # with open('questions_answers.csv', 'a', newline='') as f:
         #     writer = csv.writer(f)
