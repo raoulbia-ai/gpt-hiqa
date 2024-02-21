@@ -441,6 +441,18 @@ def handle_input(conversation):
                 user_input = "Please provide information about all centres. " + user_input
             print(f"Handling input: {user_input}")
             response = top_agent.query(user_input)
+            try:
+                # Log the available tools before querying
+                available_tools = [tool.metadata.name for tool in all_tools]
+                print(f"Available tools: {available_tools}")
+                response = top_agent.query(user_input)
+                # Log the response for debugging
+                st.write("Response from the agent:")
+                st.write(response)
+            except ValueError as e:
+                # Log the error with more details
+                print(f"Error: {str(e)}. The tool may not be registered correctly.")
+                raise e
             # Log the response for debugging
             st.write("Response from the agent:")
             st.write(response)
