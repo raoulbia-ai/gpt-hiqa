@@ -163,12 +163,14 @@ def define_tool_for_each_document_agent(wiki_titles, _agents):
                 description=wiki_summary,
             ),
         )
+        print(f"Tool created with name: {wiki_title}")
         all_tools.append(doc_tool)
     return all_tools
 
 # @st.cache_data
 def define_object_index_and_retriever(all_tools):
     tool_mapping = SimpleToolNodeMapping.from_objects(all_tools)
+    print(f"Tools registered in the index: {[tool.metadata.name for tool in all_tools]}")
     obj_index = ObjectIndex.from_objects(
         all_tools,
         tool_mapping,
@@ -202,7 +204,9 @@ class CustomObjectRetriever(ObjectRetriever):
 
     def retrieve(self, query_bundle):
         nodes = self._retriever.retrieve(query_bundle)
+        print(f"Retrieved nodes: {nodes}")
         tools = [self._object_node_mapping.from_node(n.node) for n in nodes]
+        print(f"Retrieved tools: {tools}")
 
         sub_question_engine = SubQuestionQueryEngine.from_defaults(
             query_engine_tools=tools, llm=self._llm
