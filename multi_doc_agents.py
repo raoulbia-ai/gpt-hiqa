@@ -334,11 +334,6 @@ async def main():
     if 'conversation' not in st.session_state:
         st.session_state.conversation = []
 
-    # Initialize tools and agents if not already done
-    if 'agents_initialized' not in st.session_state:
-        initialize_agents_and_tools()
-        st.session_state.agents_initialized = True
-
     # Input for questions
     user_input = st.text_input("Enter your question:", key='question_input', on_change=handle_input, args=(st.session_state.conversation,))
 
@@ -354,6 +349,11 @@ async def main():
             st.write(title)
         # Ensure the query is formed to consider all centres
         user_input = "List the names of all centres, their addresses, and the dates each centre has been inspected. Group dates by centre."
+
+    # Initialize tools and agents if not already done
+    if 'agents_initialized' not in st.session_state:
+        initialize_agents_and_tools()
+        st.session_state.agents_initialized = True
 
 def initialize_agents_and_tools():
     # This function will initialize all the necessary agents and tools
@@ -482,5 +482,8 @@ def handle_input(conversation):
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    # Ensure all initialization is done before starting the Streamlit app
+    initialize_agents_and_tools()
+    st.session_state.agents_initialized = True
+    main()
     # main()
