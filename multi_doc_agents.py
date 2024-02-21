@@ -343,7 +343,8 @@ async def handle_input(conversation):
         conversation.append(("You", user_input))
 
         prompt = ''
-        response = await top_agent.query(user_input)
+        with st.spinner('Please wait...'):
+            response = top_agent.query(user_input)
         # print(response)
         answer = get_response_without_metadata(response)
 
