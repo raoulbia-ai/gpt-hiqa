@@ -388,6 +388,7 @@ def handle_input(conversation):
         # print(response)
         answer = get_response_without_metadata(response)
 
+        if 'processing' in st.session_state and not st.session_state['processing']:
         # Save the question, the top answer, and the timestamp to a CSV file
         # with open('questions_answers.csv', 'a', newline='') as f:
         #     writer = csv.writer(f)
@@ -399,8 +400,6 @@ def handle_input(conversation):
         conversation.append(("AI", answer))
         # Clear input box
         st.session_state['processing'] = False
-
-    if 'processing' in st.session_state and not st.session_state['processing']:
         st.session_state.question_input = ""
 
 
