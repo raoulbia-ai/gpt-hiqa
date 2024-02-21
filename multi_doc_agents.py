@@ -357,32 +357,40 @@ def main():
         st.session_state.agents_initialized = initialize_agents_and_tools()
         st.session_state.agents_initialized = True
 
-def initialize_agents_and_tools() -> bool:
+def initialize_agents_and_tools():
     # This function will initialize all the necessary agents and tools
     # and ensure they are ready before the user starts interacting with the system.
-    global agents, query_engines, all_tools, vector_node_retriever, custom_node_retriever, tool_mapping, obj_index, custom_obj_retriever, top_agent
-    # Ensure documents are loaded before building agents
-    if 'city_docs' not in st.session_state or 'wiki_titles' not in st.session_state:
-        st.session_state.wiki_titles = get_wiki_titles()
-        st.session_state.city_docs = load_documents(st.session_state.wiki_titles)
-    agents, query_engines = build_agents(st.session_state.wiki_titles, [st.session_state.city_docs])
-    all_tools = define_tool_for_each_document_agent(wiki_titles, agents)
-    # Ensure all tools are created and registered before proceeding
-    verify_tool_creation(all_tools)
-    vector_node_retriever = define_object_index_and_retriever(all_tools)
-    custom_node_retriever = CustomRetriever(vector_node_retriever)
-    tool_mapping = SimpleToolNodeMapping.from_objects(all_tools)
-    obj_index = ObjectIndex.from_objects(
-        all_tools,
-        tool_mapping,
-        VectorStoreIndex,
-    )
-    custom_obj_retriever = CustomObjectRetriever(
-        custom_node_retriever, tool_mapping, all_tools, llm=llm
-    )
-    top_agent = FnRetrieverOpenAIAgent.from_retriever(
-        custom_obj_retriever,
-        system_prompt=f""" 
+    if 'agents_initialized' not in st.session_state:
+        st.session_state['agents_initialized'] = False
+
+    if not st.session_state['agents_initialized']:
+        wiki_titles = get_wiki_titles()
+        city_docs = load_documents(wiki_titles)
+        agents, query_engines = build_agents(wiki_titles, [city_docs])
+        all_tools = define_tool_for_each_document_agent(wiki_titles, agents)
+        vector_node_retriever = define_object_index_and_retriever(all_tools)
+        custom_node_retriever = CustomRetriever(vector_node_retriever)
+        tool_mapping = SimpleToolNodeMapping.from_objects(all_tools)
+        obj_index = ObjectIndex.from_objects(
+            all_tools,
+            tool_mapping,
+            VectorStoreIndex,
+        )
+        custom_obj_retriever = CustomObjectRetriever(
+            custom_node_retriever, tool_mapping, all_tools, llm=llm
+        )
+        top_agent = FnRetrieverOpenAIAgent.from_retriever(
+            custom_obj_retriever,
+            system_prompt=generate_system_prompt(wiki_titles),
+            llm=llm,
+            verbose=True,
+        )
+        st.session_state['agents_initialized'] = True
+        return True
+    return False
+
+def generate_system_prompt(wiki_titles):
+    return f""" 
     You are an AI expert in disability centre inspections, with a specialized focus on "The Health 
     Information and Quality Authority" (HIQA). HIQA is an independent authority established to drive 
     high-quality and safe care for people using our health and social care services in Ireland. HIQA’s 
@@ -390,7 +398,7 @@ def initialize_agents_and_tools() -> bool:
 
     You have knowledge about the following documents: 
 
-    {wiki_titles}
+    {', '.join(wiki_titles)}
 
     The first page of a document contains the following information:
         - Name of designated centre
@@ -414,8 +422,6 @@ def initialize_agents_and_tools() -> bool:
         - Compliance plan provider’s response
         - Summary of regulations to be complied with incl. Risk Rating and date to be complied with
 
-
-
     These documents are inspection reports of disability centres. 
     Reports may cover inspections at the same centre at different dates. 
 
@@ -428,10 +434,7 @@ def initialize_agents_and_tools() -> bool:
     centres in your response! 
 
     Do NOT rely on prior knowledge. 
-    """,
-        llm=llm,
-        verbose=True,
-    )
+    """
 
 def verify_tool_creation(all_tools):
     # Check if all tools are created and registered
