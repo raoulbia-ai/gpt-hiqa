@@ -332,18 +332,15 @@ async def main():
         st.session_state.conversation = []
 
     # Input for questions
-    user_input = st.text_input("Enter your question:", key='question_input')
-    if user_input:
-        await handle_input(st.session_state.conversation)
-        st.session_state.question_input = ""
+    user_input = st.text_input("Enter your question:", key='question_input', on_change=handle_input, args=(st.session_state.conversation,))
 
     # Display conversation
     for speaker, text in st.session_state.conversation:
         st.write(f"{speaker}: {text}")
 
 
-async def handle_input(conversation):
-    user_input = st.session_state.question_input
+def handle_input(conversation):
+    user_input = st.session_state['question_input']
     if user_input:
         # Add question to conversation
         conversation.append(("You", user_input))
@@ -363,8 +360,6 @@ async def handle_input(conversation):
 
         # Add answer to conversation
         conversation.append(("AI", answer))
-        # Clear input box
-        st.session_state.question_input = ""
 
 
 if __name__ == "__main__":
