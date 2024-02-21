@@ -331,6 +331,11 @@ async def main():
     if 'conversation' not in st.session_state:
         st.session_state.conversation = []
 
+    # Initialize tools and agents if not already done
+    if 'agents_initialized' not in st.session_state:
+        initialize_agents_and_tools()
+        st.session_state.agents_initialized = True
+
     # Input for questions
     user_input = st.text_input("Enter your question:", key='question_input', on_change=handle_input, args=(st.session_state.conversation,))
 
@@ -346,6 +351,78 @@ async def main():
             st.write(title)
         # Ensure the query is formed to consider all centres
         user_input = "List the names of all centres, their addresses, and the dates each centre has been inspected. Group dates by centre."
+
+def initialize_agents_and_tools():
+    # This function will initialize all the necessary agents and tools
+    # and ensure they are ready before the user starts interacting with the system.
+    global wiki_titles, city_docs, agents, query_engines, all_tools, vector_node_retriever, custom_node_retriever, tool_mapping, obj_index, custom_obj_retriever, top_agent
+    wiki_titles = get_wiki_titles()
+    city_docs = load_documents(wiki_titles)
+    agents, query_engines = build_agents(wiki_titles, [city_docs])
+    all_tools = define_tool_for_each_document_agent(wiki_titles, agents)
+    vector_node_retriever = define_object_index_and_retriever(all_tools)
+    custom_node_retriever = CustomRetriever(vector_node_retriever)
+    tool_mapping = SimpleToolNodeMapping.from_objects(all_tools)
+    obj_index = ObjectIndex.from_objects(
+        all_tools,
+        tool_mapping,
+        VectorStoreIndex,
+    )
+    custom_obj_retriever = CustomObjectRetriever(
+        custom_node_retriever, tool_mapping, all_tools, llm=llm
+    )
+    top_agent = FnRetrieverOpenAIAgent.from_retriever(
+        custom_obj_retriever,
+        system_prompt=f""" 
+    You are an AI expert in disability centre inspections, with a specialized focus on "The Health 
+    Information and Quality Authority" (HIQA). HIQA is an independent authority established to drive 
+    high-quality and safe care for people using our health and social care services in Ireland. HIQA’s 
+    mandate to date extends across a specified range of public, private and voluntary sector services. 
+
+    You have knowledge about the following documents: 
+
+    {wiki_titles}
+
+    The first page of a document contains the following information:
+        - Name of designated centre
+        - Name of provider
+        - Address of centre
+        - Type of inspection
+        - Date of inspection
+        - Centre ID
+
+    The document sections are:
+        - About the designated centre
+        - Number of residents on date of inspection
+        - How we inspect
+        - Date, Times of inspection, Inspector, Role
+        - What residents told us and what inspectors observed
+        - Capacity and capability
+        - Several sections related to specific regulations and their corresponding inspection outcome (aka judgement)
+        - Quality and safety
+        - Appendix 1 - Full list of regulations considered under each dimension
+        - Compliance Plan for the inspected centre
+        - Compliance plan provider’s response
+        - Summary of regulations to be complied with incl. Risk Rating and date to be complied with
+
+
+
+    These documents are inspection reports of disability centres. 
+    Reports may cover inspections at the same centre at different dates. 
+
+    Ensure your responses are comprehensive and tailored for an audience knowledgeable 
+    in the field. 
+
+    You must ALWAYS use at least one of the tools provided when answering a question.
+
+    If a question is not specific to a particular centre, you MUST include ALL
+    centres in your response! 
+
+    Do NOT rely on prior knowledge. 
+    """,
+        llm=llm,
+        verbose=True,
+    )
 
 def handle_input(conversation):
     user_input = st.session_state['question_input']
