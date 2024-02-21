@@ -74,7 +74,7 @@ def load_documents(wiki_titles):
             print(f"Failed to load document: {wiki_title}. Error: {str(e)}")
     return city_docs
 
-@cache_data
+
 def build_agents(wiki_titles, _city_docs):
     node_parser = SentenceSplitter()
     agents = {}
@@ -150,7 +150,7 @@ def build_agent(query_engine_tools, wiki_title):
     )
     return agent
 
-@cache_data
+
 def define_tool_for_each_document_agent(wiki_titles, _agents):
     all_tools = []
     for wiki_title in wiki_titles:
@@ -169,7 +169,6 @@ def define_tool_for_each_document_agent(wiki_titles, _agents):
         all_tools.append(doc_tool)
     return all_tools
 
-@cache_data
 def define_object_index_and_retriever(all_tools):
     tool_mapping = SimpleToolNodeMapping.from_objects(all_tools)
     registered_tools = [tool.metadata.name for tool in all_tools]
