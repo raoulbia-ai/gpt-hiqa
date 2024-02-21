@@ -194,6 +194,11 @@ if 'all_tools' not in st.session_state:
         )
         st.session_state['all_tools'].append(doc_tool)
 
+    # Ensure that the tool names are correctly formatted and registered
+    for file_base, info in extra_info_dict.items():
+        if f"tool_{file_base}" not in [tool.metadata.name for tool in st.session_state['all_tools']]:
+            raise ValueError(f"Tool with name tool_{file_base} not found in the registered tools")
+
 llm = OpenAI(model_name="gpt-3.5-turbo")
 
 tool_mapping = SimpleToolNodeMapping.from_objects(st.session_state['all_tools'])
@@ -336,7 +341,7 @@ def main():
 
 
     if 'agents_dict' not in st.session_state or 'extra_info_dict' not in st.session_state:
-        st.session_state['agents_dict'], st.session_state['extra_info_dict'] = asyncio.run(build_agents(docs))
+        asyncio.run(build_agents(docs))
 
     try:
         st.title("HIQA Inspection Reports Q&A")
@@ -372,7 +377,9 @@ def handle_input(conversation):
         st.session_state['processing'] = True
 
         prompt = ''
-        response = top_agent.query(user_input)
+        # Ensure that the top_agent is using the latest session state tools
+        top_agent.query_engine_tools = st.session_state['all_tools']
+        response = top_agent.query(user_input.strip())
         # print(response)
         answer = get_response_without_metadata(response)
 
