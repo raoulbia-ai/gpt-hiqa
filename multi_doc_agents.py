@@ -81,6 +81,7 @@ def build_agents(wiki_titles, _city_docs):
     query_engines = {}
     all_nodes = []
     for idx, wiki_title in enumerate(wiki_titles):
+        documents = [doc_dict[wiki_title] for doc_dict in _city_docs if wiki_title in doc_dict]
         # nodes = node_parser.get_nodes_from_documents([city_docs[wiki_title]])
         documents = [doc_dict[wiki_title] for doc_dict in _city_docs if wiki_title in doc_dict]
         # nodes = node_parser.get_nodes_from_documents(documents)
@@ -89,7 +90,7 @@ def build_agents(wiki_titles, _city_docs):
         all_nodes.extend(nodes)
         vector_index, summary_index = build_indexes(wiki_title, nodes)
         query_engine_tools = define_tools(vector_index, summary_index, wiki_title)
-        agent = build_agent(query_engine_tools, wiki_title, wiki_titles)
+        agent = build_agent(query_engine_tools, wiki_title)
         agents[wiki_title] = agent
         query_engines[wiki_title] = vector_index.as_query_engine(similarity_top_k=2)
     return agents, query_engines
