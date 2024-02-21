@@ -150,6 +150,7 @@ You must ALWAYS use at least one of the tools provided when answering a question
     return agent, summary
 
 
+
 async def build_agents(docs):
     node_parser = SentenceSplitter()
 
@@ -157,9 +158,10 @@ async def build_agents(docs):
     agents_dict = {}
     extra_info_dict = {}
 
-    # # this is for the baseline
-    # all_nodes = []
-
+    if 'agents_dict' not in st.session_state:
+            st.session_state['agents_dict'] = {}
+            st.session_state['extra_info_dict'] = {}
+   
     for idx, doc in enumerate(tqdm(docs)):
         nodes = node_parser.get_nodes_from_documents([doc])
         # all_nodes.extend(nodes)
@@ -169,88 +171,88 @@ async def build_agents(docs):
         file_base = str(file_path.parent.stem) + "_" + str(file_path.stem)
         agent, summary = await build_agent_per_doc(nodes, file_base)
 
-        agents_dict[file_base] = agent
-        extra_info_dict[file_base] = {"summary": summary, "nodes": nodes}
+        st.session_state['agents_dict'][file_base] = agent
+        st.session_state['extra_info_dict'][file_base] = {"summary": summary, "nodes": nodes}
 
-    return agents_dict, extra_info_dict
+    return st.session_state['agents_dict'], st.session_state['extra_info_dict']
 
 docs = load_documents(titles)
 agents_dict, extra_info_dict = asyncio.run(build_agents(docs))
 
 
-# define tool for each document agent
-all_tools = []
-for file_base, agent in agents_dict.items():
-    summary = extra_info_dict[file_base]["summary"]
-    doc_tool = QueryEngineTool(
-        query_engine=agent,
-        metadata=ToolMetadata(
-            name=f"tool_{file_base}",
-            description=summary,
-        ),
-    )
-    all_tools.append(doc_tool)
+if 'all_tools' not in st.session_state:
+    # define tool for each document agent
+    st.session_state['all_tools'] = []
+    for file_base, agent in agents_dict.items():
+        summary = extra_info_dict[file_base]["summary"]
+        doc_tool = QueryEngineTool(
+            query_engine=agent,
+            metadata=ToolMetadata(
+                name=f"tool_{file_base}",
+                description=summary,
+            ),
+        )
+        st.session_state['all_tools'].append(doc_tool)
 
-    llm = OpenAI(model_name="gpt-3.5-turbo")
+llm = OpenAI(model_name="gpt-3.5-turbo")
 
-    tool_mapping = SimpleToolNodeMapping.from_objects(all_tools)
-    obj_index = ObjectIndex.from_objects(
-        all_tools,
-        tool_mapping,
-        VectorStoreIndex,
-    )
-    vector_node_retriever = obj_index.as_node_retriever(similarity_top_k=10)
+tool_mapping = SimpleToolNodeMapping.from_objects(st.session_state['all_tools'])
+obj_index = ObjectIndex.from_objects(
+    st.session_state['all_tools'],
+    tool_mapping,
+    VectorStoreIndex,
+)
+vector_node_retriever = obj_index.as_node_retriever(similarity_top_k=10)
+
+# define a custom retriever with reranking
+class CustomRetriever(BaseRetriever):
+    def __init__(self, vector_retriever, postprocessor=None):
+        self._vector_retriever = vector_retriever
+        self._postprocessor = postprocessor or CohereRerank(top_n=5)
+        super().__init__()
+
+    def _retrieve(self, query_bundle):
+        retrieved_nodes = self._vector_retriever.retrieve(query_bundle)
+        filtered_nodes = self._postprocessor.postprocess_nodes(
+            retrieved_nodes, query_bundle=query_bundle
+        )
+
+        return filtered_nodes
 
 
-    # define a custom retriever with reranking
-    class CustomRetriever(BaseRetriever):
-        def __init__(self, vector_retriever, postprocessor=None):
-            self._vector_retriever = vector_retriever
-            self._postprocessor = postprocessor or CohereRerank(top_n=5)
-            super().__init__()
+# define a custom object retriever that adds in a query planning tool
+class CustomObjectRetriever(ObjectRetriever):
+    def __init__(self, retriever, object_node_mapping, all_tools, llm=None):
+        self._retriever = retriever
+        self._object_node_mapping = object_node_mapping
+        self._llm = llm or OpenAI("gpt-3.5-turbo")
 
-        def _retrieve(self, query_bundle):
-            retrieved_nodes = self._vector_retriever.retrieve(query_bundle)
-            filtered_nodes = self._postprocessor.postprocess_nodes(
-                retrieved_nodes, query_bundle=query_bundle
-            )
+    def retrieve(self, query_bundle):
+        nodes = self._retriever.retrieve(query_bundle)
+        tools = [self._object_node_mapping.from_node(n.node) for n in nodes]
 
-            return filtered_nodes
+        sub_question_engine = SubQuestionQueryEngine.from_defaults(
+            query_engine_tools=tools, llm=self._llm
+        )
+        sub_question_description = f"""\
+Useful for any queries that involve comparing multiple documents. ALWAYS use this tool for comparison queries - make sure to call this \
+tool with the original query. Do NOT use the other tools for any queries involving multiple documents.
+"""
+        sub_question_tool = QueryEngineTool(
+            query_engine=sub_question_engine,
+            metadata=ToolMetadata(
+                name="compare_tool", description=sub_question_description
+            ),
+        )
 
-
-    # define a custom object retriever that adds in a query planning tool
-    class CustomObjectRetriever(ObjectRetriever):
-        def __init__(self, retriever, object_node_mapping, all_tools, llm=None):
-            self._retriever = retriever
-            self._object_node_mapping = object_node_mapping
-            self._llm = llm or OpenAI("gpt-3.5-turbo")
-
-        def retrieve(self, query_bundle):
-            nodes = self._retriever.retrieve(query_bundle)
-            tools = [self._object_node_mapping.from_node(n.node) for n in nodes]
-
-            sub_question_engine = SubQuestionQueryEngine.from_defaults(
-                query_engine_tools=tools, llm=self._llm
-            )
-            sub_question_description = f"""\
-    Useful for any queries that involve comparing multiple documents. ALWAYS use this tool for comparison queries - make sure to call this \
-    tool with the original query. Do NOT use the other tools for any queries involving multiple documents.
-    """
-            sub_question_tool = QueryEngineTool(
-                query_engine=sub_question_engine,
-                metadata=ToolMetadata(
-                    name="compare_tool", description=sub_question_description
-                ),
-            )
-
-            return tools + [sub_question_tool]
+        return tools + [sub_question_tool]
 
 
 custom_node_retriever = CustomRetriever(vector_node_retriever)
 
 # wrap it with ObjectRetriever to return objects
 custom_obj_retriever = CustomObjectRetriever(
-    custom_node_retriever, tool_mapping, all_tools, llm=llm
+    custom_node_retriever, tool_mapping, st.session_state['all_tools'], llm=llm
 )
 
 top_agent = FnRetrieverOpenAIAgent.from_retriever(
@@ -324,13 +326,6 @@ def get_response_without_metadata(response):
     # print(response)
     return response  # response['choices'][0]['text']
 
-
-async def build_agents(docs):
-    # The original recursive call has been removed to prevent infinite recursion.
-    # Implementation of the function should be here.
-    # Since the implementation details are not provided, I'm assuming the function is meant to be asynchronous.
-    # You should add the actual implementation of build_agents here.
-    pass
 
 def main():
     # Clear cache if needed
