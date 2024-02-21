@@ -1,3 +1,6 @@
+import nest_asyncio
+nest_asyncio.apply()
+
 import os, json
 from pathlib import Path
 # from streamlit import caching
@@ -45,82 +48,84 @@ data_dir_path = Path(dir_path)
 
 llm = OpenAI(temperature=0, model='gpt-3.5-turbo')
 
-wiki_titles = []
-for file_path in data_dir_path.glob('*.pdf'):
-    wiki_titles.append(file_path.stem)
+titles = []
+for file_path in dir_path.glob('*.pdf'):
+    titles.append(file_path.stem)
 
 
 @st.cache_resource
-def load_documents(wiki_titles):
-    city_docs = {}
-    for idx, wiki_title in enumerate(wiki_titles):
+def load_documents(titles):
+    docs = []
+    for idx, title in enumerate(titles):
         try:
-            city_docs[wiki_title] = SimpleDirectoryReader(
-                input_files=[f"{dir_path}/{wiki_title}.pdf"]
-            ).load_data()
-            print(f"Successfully loaded document: {wiki_title}")
+            docs.append(SimpleDirectoryReader(
+                input_files=[f"{dir_path}/{title}.pdf"]
+            ).load_data())
+            print(f"Successfully loaded document: {title}")
         except Exception as e:
-            print(f"Error loading document: {wiki_title}. Error: {str(e)}")
-    return city_docs
+            print(f"Error loading document: {title}. Error: {str(e)}")
+    return docs
+
+st.session_state.docs_loaded = False
+if 'docs_loaded' not in st.session_state:
+    st.session_state.docs = load_documents(titles)
+    st.session_state.docs_loaded = True
+docs = st.session_state.city_docs
 
 
-node_parser = SentenceSplitter()
+Settings.llm = OpenAI(model="gpt-3.5-turbo")
+Settings.embed_model = OpenAIEmbedding(model="text-embedding-3-small")
 
-if 'city_docs_loaded' not in st.session_state:
-    st.session_state.city_docs = load_documents(wiki_titles)
-    st.session_state.city_docs_loaded = True
-city_docs = st.session_state.city_docs
+async def build_agent_per_doc(nodes, file_base):
+    print(file_base)
 
-# Build agents dictionary
-agents = {}
-query_engines = {}
-
-# this is for the baseline
-all_nodes = []
-
-for idx, wiki_title in enumerate(wiki_titles):
-    nodes = node_parser.get_nodes_from_documents(city_docs[wiki_title])
-    all_nodes.extend(nodes)
-
-    if not os.path.exists(f"./data/{wiki_title}"):
+    vi_out_path = f"./data/llamaindex_docs/{file_base}"
+    summary_out_path = f"./data/llamaindex_docs/{file_base}_summary.pkl"
+    if not os.path.exists(vi_out_path):
+        Path("./data/llamaindex_docs/").mkdir(parents=True, exist_ok=True)
         # build vector index
         vector_index = VectorStoreIndex(nodes)
-        vector_index.storage_context.persist(
-            persist_dir=f"./data/{wiki_title}"
-        )
+        vector_index.storage_context.persist(persist_dir=vi_out_path)
     else:
         vector_index = load_index_from_storage(
-            StorageContext.from_defaults(persist_dir=f"./data/{wiki_title}"),
+            StorageContext.from_defaults(persist_dir=vi_out_path),
         )
 
     # build summary index
     summary_index = SummaryIndex(nodes)
+
     # define query engines
     vector_query_engine = vector_index.as_query_engine(llm=llm)
-    summary_query_engine = summary_index.as_query_engine(llm=llm)
+    summary_query_engine = summary_index.as_query_engine(
+        response_mode="tree_summarize", llm=llm
+    )
+
+    # extract a summary
+    if not os.path.exists(summary_out_path):
+        Path(summary_out_path).parent.mkdir(parents=True, exist_ok=True)
+        summary = str(
+            await summary_query_engine.aquery(
+                "Extract a concise 1-2 line summary of this document"
+            )
+        )
+        pickle.dump(summary, open(summary_out_path, "wb"))
+    else:
+        summary = pickle.load(open(summary_out_path, "rb"))
 
     # define tools
     query_engine_tools = [
         QueryEngineTool(
             query_engine=vector_query_engine,
             metadata=ToolMetadata(
-                name="vector_tool",
-                description=(
-                    "Useful for questions related to specific aspects of"
-                    f" {wiki_title} (e.g. the history, arts and culture,"
-                    " sports, demographics, or more)."
-                ),
+                name=f"vector_tool_{file_base}",
+                description=f"Useful for questions related to specific facts",
             ),
         ),
         QueryEngineTool(
             query_engine=summary_query_engine,
             metadata=ToolMetadata(
-                name="summary_tool",
-                description=(
-                    "Useful for any requests that require a holistic summary"
-                    f" of EVERYTHING about {wiki_title}. For questions about"
-                    " more specific sections, please use the vector_tool."
-                ),
+                name=f"summary_tool_{file_base}",
+                description=f"Useful for summarization questions",
             ),
         ),
     ]
@@ -132,151 +137,40 @@ for idx, wiki_title in enumerate(wiki_titles):
         llm=function_llm,
         verbose=True,
         system_prompt=f"""\
-You are a specialized agent designed to answer queries about {wiki_title}.
+You are a specialized agent designed to answer queries about the `{file_base}.html` part of the LlamaIndex docs.
 You must ALWAYS use at least one of the tools provided when answering a question; do NOT rely on prior knowledge.\
 """,
     )
 
-    agents[wiki_title] = agent
-    query_engines[wiki_title] = vector_index.as_query_engine(
-        similarity_top_k=2
-    )
-
-# define tool for each document agent
-all_tools = []
-for wiki_title in wiki_titles:
-    wiki_summary = (
-        f"This content contains Wikipedia articles about {wiki_title}. Use"
-        f" this tool if you want to answer any questions about {wiki_title}.\n"
-    )
-    doc_tool = QueryEngineTool(
-        query_engine=agents[wiki_title],
-        metadata=ToolMetadata(
-            name=f"tool_{wiki_title}",
-            description=wiki_summary,
-        ),
-    )
-    all_tools.append(doc_tool)
-
-tool_mapping = SimpleToolNodeMapping.from_objects(all_tools)
-obj_index = ObjectIndex.from_objects(
-    all_tools,
-    tool_mapping,
-    VectorStoreIndex,
-)
-vector_node_retriever = obj_index.as_node_retriever(similarity_top_k=10)
-
-# define a custom retriever with reranking
-class CustomRetriever(BaseRetriever):
-    def __init__(self, vector_retriever, postprocessor=None):
-        self._vector_retriever = vector_retriever
-        self._postprocessor = postprocessor or CohereRerank(top_n=5)
-        super().__init__()
-
-    def _retrieve(self, query_bundle):
-        retrieved_nodes = self._vector_retriever.retrieve(query_bundle)
-        filtered_nodes = self._postprocessor.postprocess_nodes(
-            retrieved_nodes, query_bundle=query_bundle
-        )
-
-        return filtered_nodes
+    return agent, summary
 
 
-# define a custom object retriever that adds in a query planning tool
-class CustomObjectRetriever(ObjectRetriever):
-    def __init__(self, retriever, object_node_mapping, all_tools, llm=None):
-        self._retriever = retriever
-        self._object_node_mapping = object_node_mapping
-        self._llm = llm or OpenAI("gpt-3.5-turbo")
+async def build_agents(docs):
+    node_parser = SentenceSplitter()
 
-    def retrieve(self, query_bundle):
-        nodes = self._retriever.retrieve(query_bundle)
-        tools = [self._object_node_mapping.from_node(n.node) for n in nodes]
+    # Build agents dictionary
+    agents_dict = {}
+    extra_info_dict = {}
 
-        sub_question_engine = SubQuestionQueryEngine.from_defaults(
-            query_engine_tools=tools, llm=self._llm
-        )
-        sub_question_description = (
-            "Useful for any queries that involve comparing multiple documents. "
-            "ALWAYS use this tool for comparison queries - make sure to call this "
-            "tool with the original query. Do NOT use the other tools for any queries "
-            "involving multiple documents."
-        )
-                Useful for any queries that involve comparing multiple documents. ALWAYS use this tool for comparison queries - make sure to call this \
-                tool with the original query. Do NOT use the other tools for any queries involving multiple documents.
-                """
-        sub_question_tool = QueryEngineTool(
-            query_engine=sub_question_engine,
-            metadata=ToolMetadata(
-                name="compare_tool", description=sub_question_description
-            ),
-        )
+    # # this is for the baseline
+    # all_nodes = []
 
-        return tools + [sub_question_tool]
-    
+    for idx, doc in enumerate(tqdm(docs)):
+        nodes = node_parser.get_nodes_from_documents([doc])
+        # all_nodes.extend(nodes)
+
+        # ID will be base + parent
+        file_path = Path(doc.metadata["path"])
+        file_base = str(file_path.parent.stem) + "_" + str(file_path.stem)
+        agent, summary = await build_agent_per_doc(nodes, file_base)
+
+        agents_dict[file_base] = agent
+        extra_info_dict[file_base] = {"summary": summary, "nodes": nodes}
+
+    return agents_dict, extra_info_dict
 
 
-custom_node_retriever = CustomRetriever(vector_node_retriever)
-
-custom_obj_retriever = CustomObjectRetriever(
-    custom_node_retriever, tool_mapping, all_tools, llm=llm
-)
-
-top_agent = FnRetrieverOpenAIAgent.from_retriever(
-    custom_obj_retriever,
-    system_prompt=""" 
-You are an AI expert in disability centre inspections, with a specialized focus on "The Health 
-                    Information and Quality Authority" (HIQA). HIQA is an independent authority established to drive 
-                    high-quality and safe care for people using our health and social care services in Ireland. HIQA’s 
-                    mandate to date extends across a specified range of public, private and voluntary sector services. 
-
-                    You have knowledge about the following documents:
-
-                    {wiki_titles}
-
-                    The first page of a document contains the following information:
-                        - Name of designated centre
-                        - Name of provider
-                        - Address of centre
-                        - Type of inspection
-                        - Date of inspection
-                        - Centre ID
-
-                    The document sections are:
-                        - About the designated centre
-                        - Number of residents on date of inspection
-                        - How we inspect
-                        - Date, Times of inspection, Inspector, Role
-                        - What residents told us and what inspectors observed
-                        - Capacity and capability
-                        - Several sections related to specific regulations and their corresponding inspection outcome (aka judgement)
-                        - Quality and safety
-                        - Appendix 1 - Full list of regulations considered under each dimension
-                        - Compliance Plan for the inspected centre
-                        - Compliance plan provider’s response
-                        - Summary of regulations to be complied with incl. Risk Rating and date to be complied with
-
-
-
-                    These documents are inspection reports of disability centres. 
-                    Reports may cover inspections at the same centre at different dates. 
-
-                    Ensure your responses are comprehensive and tailored for an audience knowledgeable 
-                    in the field. 
-
-                    You must ALWAYS use at least one of the tools provided when answering a question.
-
-                    If a question is not specific to a particular centre, you MUST include ALL
-                    centres in your response! 
-
-                    Do NOT rely on prior knowledge.
-""",
-    llm=llm,
-    verbose=True,
-)
-
-
-
+agents_dict, extra_info_dict = await build_agents(docs)
 
 
 # Function to get the session state
@@ -302,9 +196,9 @@ def main():
     # caching.clear_cache()
 
     # Load documents if not already loaded
-    if 'city_docs_loaded' not in st.session_state:
-        st.session_state.city_docs = load_documents(wiki_titles)
-        st.session_state.city_docs_loaded = True
+    if 'docs_loaded' not in st.session_state:
+        st.session_state.docs = load_documents(titles)
+        st.session_state.docs_loaded = True
 
 
     try:
@@ -349,5 +243,5 @@ def handle_input(conversation):
             st.session_state.question_input = ""
 
 
-if __name__ == "__main__":
-    main()
+# if __name__ == "__main__":
+#     main()
