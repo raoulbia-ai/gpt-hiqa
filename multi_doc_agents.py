@@ -326,7 +326,11 @@ def get_response_without_metadata(response):
 
 
 async def build_agents(docs):
-    return await build_agents(docs)
+    # The original recursive call has been removed to prevent infinite recursion.
+    # Implementation of the function should be here.
+    # Since the implementation details are not provided, I'm assuming the function is meant to be asynchronous.
+    # You should add the actual implementation of build_agents here.
+    pass
 
 def main():
     # Clear cache if needed
