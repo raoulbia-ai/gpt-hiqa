@@ -355,6 +355,10 @@ def handle_input(conversation):
 
         prompt = ''
         with st.spinner('Please wait...'):
+            # Check if the query mentions any known centre names
+            if not any(centre_name.lower() in user_input.lower() for centre_name in wiki_titles):
+                # Modify the query to include information about all centres
+                user_input = "Please provide information about all centres. " + user_input
             response = top_agent.query(user_input)
             # Log the response for debugging
             st.write("Response from the agent:")
