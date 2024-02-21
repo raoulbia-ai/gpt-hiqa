@@ -344,6 +344,7 @@ def main():
 
     # Check if all centres are being considered
     if user_input and user_input.lower().startswith("list the names of the centres"):
+    if user_input and user_input.lower().startswith("list the names of the centres"):
         # Log the titles of all centres
         st.write("All available centres:")
         for title in wiki_titles:
