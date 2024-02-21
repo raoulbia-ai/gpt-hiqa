@@ -203,8 +203,10 @@ class CustomObjectRetriever(ObjectRetriever):
         self._llm = llm or OpenAI("gpt-3.5-turbo")
 
     def retrieve(self, query_bundle):
+        print(f"Query bundle for retrieval: {query_bundle}")
         nodes = self._retriever.retrieve(query_bundle)
         print(f"Retrieved nodes: {nodes}")
+        print(f"Raw retrieved nodes: {nodes}")
         tools = [self._object_node_mapping.from_node(n.node) for n in nodes]
         print(f"Retrieved tools: {tools}")
 
