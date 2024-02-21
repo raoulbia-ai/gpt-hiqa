@@ -301,14 +301,14 @@ def main():
         st.write(f"{speaker}: {text}")
 
 
-def handle_input(conversation):
+async def handle_input(conversation):
     user_input = st.session_state.question_input
     if user_input:
         # Add question to conversation
         conversation.append(("You", user_input))
 
         prompt = ''
-        response = top_agent.query(user_input)
+        response = await top_agent.query(user_input)
         # print(response)
         answer = get_response_without_metadata(response)
 
@@ -326,4 +326,5 @@ def handle_input(conversation):
 
 
 if __name__ == "__main__":
+    asyncio.run(main())
     main()
