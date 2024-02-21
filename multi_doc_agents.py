@@ -70,7 +70,7 @@ st.session_state.docs_loaded = False
 if 'docs_loaded' not in st.session_state:
     st.session_state.docs = load_documents(titles)
     st.session_state.docs_loaded = True
-docs = st.session_state.city_docs
+docs = st.session_state.docs
 
 
 Settings.llm = OpenAI(model="gpt-3.5-turbo")
@@ -198,9 +198,7 @@ def main():
     # caching.clear_cache()
 
     # Load documents if not already loaded
-    if 'docs_loaded' not in st.session_state:
-        st.session_state.docs = load_documents(titles)
-        st.session_state.docs_loaded = True
+    # This block is redundant as the loading is handled above and should be removed
 
 
     try:
