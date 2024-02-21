@@ -316,7 +316,7 @@ def get_response_without_metadata(response):
     return response  # response['choices'][0]['text']
 
 
-def main():
+async def main():
     st.title("HIQA Inspection Reports Q&A")
     st.write("""Proof of Concept ChatGPT Application trained on inspection reports for 
         disability centers in Leitrim.""")
@@ -326,8 +326,10 @@ def main():
         st.session_state.conversation = []
 
     # Input for questions
-    user_input = st.text_input("Enter your question:", key='question_input', on_change=handle_input,
-                               args=(st.session_state.conversation,))
+    user_input = st.text_input("Enter your question:", key='question_input')
+    if user_input:
+        await handle_input(st.session_state.conversation)
+        st.session_state.question_input = ""
 
     # Display conversation
     for speaker, text in st.session_state.conversation:
@@ -359,5 +361,10 @@ async def handle_input(conversation):
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    if st._is_running_with_streamlit:
+        main_coroutine = main()
+        asyncio.run(main_coroutine)
+    else:
+        # Fallback in case we're not running within Streamlit
+        asyncio.run(main())
     # main()
