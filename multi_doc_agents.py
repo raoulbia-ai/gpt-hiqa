@@ -485,5 +485,5 @@ if __name__ == "__main__":
     # Ensure all initialization is done before starting the Streamlit app
     initialize_agents_and_tools()
     st.session_state.agents_initialized = True
-    main()
+    asyncio.run(main())
     # main()
