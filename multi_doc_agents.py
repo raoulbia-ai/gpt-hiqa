@@ -133,14 +133,14 @@ def define_tools(vector_index, summary_index, wiki_title):
     ]
     return query_engine_tools
 
-def build_agent(query_engine_tools, wiki_title, wiki_titles):
+def build_agent(query_engine_tools, wiki_title):
     system_prompt = f"""
                     You have knowledge about the following documents: {wiki_title}.
                     This document is an inspection report of disability centre {wiki_title}.
                     The first page of a document contains the following information: Name of designated centre,
                     Name of provider, Address of centre, Type of inspection, Date of inspection, and Centre ID.
                     """
-    function_llm = OpenAI(model="gpt-3.5-turbo")
+    function_llm = OpenAI(temperature=0, model="gpt-3.5-turbo")
     agent = OpenAIAgent.from_tools(
         query_engine_tools,
         llm=function_llm,
