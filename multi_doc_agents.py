@@ -68,7 +68,7 @@ city_docs = load_documents(wiki_titles)
 node_parser = SentenceSplitter()
 
 if 'city_docs_loaded' not in st.session_state:
-    st.session_state.city_docs = load_documents(wiki_titles)
+    st.session_state.city_docs = city_docs
     st.session_state.city_docs_loaded = True
 city_docs = st.session_state.city_docs
 
