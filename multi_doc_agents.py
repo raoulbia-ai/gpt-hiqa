@@ -325,7 +325,6 @@ def get_response_without_metadata(response):
     return response  # response['choices'][0]['text']
 
 
-@st.cache(allow_output_mutation=True)
 async def build_agents(docs):
     return await build_agents(docs)
 
