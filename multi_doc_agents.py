@@ -82,7 +82,7 @@ Settings.llm = OpenAI(model="gpt-3.5-turbo")
 Settings.embed_model = OpenAIEmbedding(model="text-embedding-3-small")
 
 async def build_agent_per_doc(nodes, file_base):
-    print(file_base)
+    print(f'file_base: {file_base}')
 
     vi_out_path = f"persist/{file_base}"
     summary_out_path = f"persist/{file_base}_summary.pkl"
@@ -110,7 +110,7 @@ async def build_agent_per_doc(nodes, file_base):
         Path(summary_out_path).parent.mkdir(parents=True, exist_ok=True)
         summary = str(
             await summary_query_engine.aquery(
-                "Extract a concise 1-2 line summary of this document"
+                "Extract a concise 1-2 sentence summary of this document."
             )
         )
         pickle.dump(summary, open(summary_out_path, "wb"))
@@ -123,7 +123,7 @@ async def build_agent_per_doc(nodes, file_base):
             query_engine=vector_query_engine,
             metadata=ToolMetadata(
                 name=f"{file_base}",
-                description=f"Useful for questions related to specific facts",
+                description=f"Useful for questions related to specific facts about {file_base} ",
             ),
         ),
         QueryEngineTool(
@@ -141,10 +141,11 @@ async def build_agent_per_doc(nodes, file_base):
         query_engine_tools,
         llm=function_llm,
         verbose=True,
-        system_prompt=f"""\
-You are a specialized agent designed to answer queries about the `{file_base}.html` part of the LlamaIndex docs.
-You must ALWAYS use at least one of the tools provided when answering a question; do NOT rely on prior knowledge.\
-""",
+        system_prompt=f"""
+                        You are a specialized agent designed to answer queries about the {file_base} document.
+                        You must ALWAYS use at least one of the tools provided when answering a question; 
+                        do NOT rely on prior knowledge.\
+                        """,
     )
 
     return agent, summary
@@ -159,11 +160,12 @@ async def build_agents(docs):
     extra_info_dict = {}    
     
     for idx, doc in enumerate(tqdm(docs)):
+        # print(doc)
         nodes = node_parser.get_nodes_from_documents([doc])
         # all_nodes.extend(nodes)
 
         # ID will be base + parent
-        # file_path = Path(doc.metadata["path"])
+        file_path = Path(doc.metadata["path"])
         # file_base = str(file_path.parent.stem) + "_" + str(file_path.stem)
         file_base = str(file_path.stem)
         agent, summary = await build_agent_per_doc(nodes, file_base)
@@ -175,6 +177,7 @@ async def build_agents(docs):
 
 # Your code block here...
 docs = load_documents(titles)
+# print(docs)
 agents_dict, extra_info_dict = asyncio.run(build_agents(docs))
 
 all_tools = []
@@ -183,8 +186,8 @@ for file_base, agent in agents_dict.items():
     doc_tool = QueryEngineTool(
         query_engine=agent,
         metadata=ToolMetadata(
-            name=f"tool_{file_base}",
-            description=summary,
+            name=f"{file_base}",
+            description='',
         ),
     )
     all_tools.append(doc_tool)
@@ -200,8 +203,6 @@ obj_index = ObjectIndex.from_objects(
 vector_node_retriever = obj_index.as_node_retriever(similarity_top_k=10)
 
 
-
-# Your Streamlit widget here...
 
 # define a custom retriever with reranking
 class CustomRetriever(BaseRetriever):
@@ -234,13 +235,15 @@ class CustomObjectRetriever(ObjectRetriever):
             query_engine_tools=tools, llm=self._llm
         )
         sub_question_description = f"""\
-Useful for any queries that involve comparing multiple documents. ALWAYS use this tool for comparison queries - make sure to call this \
-tool with the original query. Do NOT use the other tools for any queries involving multiple documents.
-"""
+        Useful for any queries that involve comparing multiple documents. 
+        ALWAYS use this tool for comparison queries - make sure to call this \
+        tool with the original query. Do NOT use the other tools for any queries involving multiple documents.
+        """
         sub_question_tool = QueryEngineTool(
             query_engine=sub_question_engine,
             metadata=ToolMetadata(
-                name="compare_tool", description=sub_question_description
+                name="compare_tool",
+                description=sub_question_description
             ),
         )
 
@@ -335,7 +338,7 @@ def main():
 
 
     if 'agents_dict' not in st.session_state or 'extra_info_dict' not in st.session_state:
-        st.session_state['agents_dict'], st.session_state['extra_info_dict'] = asyncio.run(build_agents(docs))
+        st.session_state['agents_dict'] = asyncio.run(build_agents(docs))
 
     try:
         st.title("HIQA Inspection Reports Q&A")
@@ -356,7 +359,7 @@ def main():
 
         # Use the cached agents and extra info from the session state
         agents_dict = st.session_state['agents_dict']
-        extra_info_dict = st.session_state['extra_info_dict']
+        # extra_info_dict = st.session_state['extra_info_dict']
 
     except Exception as e:
         st.error(f"An error occurred: {e}")
