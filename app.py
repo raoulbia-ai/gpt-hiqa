@@ -33,25 +33,25 @@ def initialize():
         st.session_state.initialized = True
 
 def main():
-    st.title("HIQA Inspection Reports Q&A")
-    st.write("""Proof of Concept ChatGPT Application trained on inspection reports for 
+    st.markdown("# HIQA Inspection Reports Q&A")
+    st.markdown("""Proof of Concept ChatGPT Application trained on inspection reports for 
         disability centers in Leitrim.""")
+    st.markdown("""To see a list of available documents, simply type: /list""")
 
     initialize()
 
-
     # Input for questions
-    user_input = st.text_input("Enter your question:", key='question_input',
-                               on_change=handle_input,
-                               args=(st.session_state.conversation,))
+    user_input = st.text_input("Enter your question:", key='question_input')
+
+    if st.button('➡️'):
+        handle_input(st.session_state.conversation, user_input)
 
     # Display conversation
     for speaker, text in st.session_state.conversation:
         st.write(f"{speaker}: {text}")
 
 
-def handle_input(conversation):
-    user_input = st.session_state.question_input
+def handle_input(conversation, user_input):
     if user_input:
         # Add question to conversation
         conversation.append(("You", user_input))
@@ -59,16 +59,12 @@ def handle_input(conversation):
         st.session_state['processing'] = True
 
         with st.spinner('Processing...'):
-
             response = st.session_state['query_manager'].get_answer().query(user_input)
-
-
 
         # Add answer to conversation
         conversation.append(("AI", response))
         # Clear input box
         st.session_state['processing'] = False
-        st.session_state.question_input = ""
 
 if __name__ == '__main__':
     main()
