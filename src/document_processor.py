@@ -10,7 +10,7 @@ from llama_index.core import Settings
 from llama_index.llms.openai import OpenAI
 from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.agent.openai import OpenAIAgent
-from llama_index.llms.azure_openai import AzureOpenAI
+# from llama_index.llms.azure_openai import AzureOpenAI
 
 class DocumentProcessor:
     def __init__(self, llm, embed_model, documents_dir='data/hiqa_pdfs'):
@@ -67,9 +67,13 @@ class DocumentProcessor:
         summary_index = SummaryIndex(nodes)
 
         # define query engines
-        vector_query_engine = vector_index.as_query_engine(llm=self.llm)
+        # https://colab.research.google.com/drive/1ZAdrabTJmZ_etDp10rjij_zME2Q3umAQ?usp=sharing#scrollTo=aCdR2_wmNol6
+        vector_query_engine = vector_index.as_query_engine(
+            response_mode="compact",
+            llm=self.llm)
         summary_query_engine = summary_index.as_query_engine(
-            response_mode="tree_summarize", llm=self.llm
+            response_mode="compact", #"tree_summarize",     # <<<<<<<<<<<<<<<<  look up difference (see also "refine")
+            llm=self.llm
         )
 
         # extract a summary
