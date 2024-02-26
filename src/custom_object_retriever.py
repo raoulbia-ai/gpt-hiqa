@@ -1,10 +1,12 @@
 from config import COHERE_API_KEY
+from query_bundle_module import QueryBundle
 from llama_index.core.retrievers import BaseRetriever
 from functools import lru_cache
 from llama_index.postprocessor.cohere_rerank import CohereRerank
 from llama_index.core.objects import ObjectRetriever
 from llama_index.core.tools import QueryEngineTool, ToolMetadata
 from llama_index.core.query_engine import SubQuestionQueryEngine
+from functools import lru_cache
 
 from functools import lru_cache
 
