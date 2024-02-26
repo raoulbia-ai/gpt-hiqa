@@ -22,8 +22,11 @@ def serialize_query_bundle(query_bundle):
 def deserialize_query_bundle(serialized_query):
     # Deserialize the string representation back into a QueryBundle object
     # This is a placeholder function and should be adapted to the structure of QueryBundle
-    # Example: return QueryBundle.from_serialized(serialized_query)
-    raise NotImplementedError("Deserialization method needs to be implemented")
+    # Assuming QueryBundle can be instantiated with a dictionary of its attributes
+    import ast
+    query_dict = ast.literal_eval(serialized_query)
+    # Replace the following line with the correct instantiation of QueryBundle
+    return QueryBundle(**query_dict)
 
 class CustomRetriever(BaseRetriever):
     def __init__(self, vector_retriever, postprocessor=None):
