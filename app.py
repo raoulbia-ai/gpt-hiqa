@@ -71,6 +71,8 @@ def handle_input(conversation, user_input):
         time_taken = end_time - start_time
         st.write(f"Cache used: {cache_used}")
         st.write(f"Time taken: {time_taken:.2f} seconds")
+        # Reset cache_used attribute for the next query
+        st.session_state['query_manager'].cache_used = False
         # Clear input box
         st.session_state['processing'] = False
 
