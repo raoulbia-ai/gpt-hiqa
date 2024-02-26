@@ -1,5 +1,4 @@
 import streamlit as st
-from gptcache import GPTCache
 from src.document_processor import DocumentProcessor  # Adjust import path as necessary
 from src.query_manager import QueryManager  # Adjust import path as necessary
 from config import llm_instance, embedding_instance
