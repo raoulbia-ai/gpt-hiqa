@@ -6,6 +6,12 @@ from llama_index.core.objects import ObjectRetriever
 from llama_index.core.tools import QueryEngineTool, ToolMetadata
 from llama_index.core.query_engine import SubQuestionQueryEngine
 
+from functools import lru_cache
+
+def hashable_query_bundle(query_bundle):
+    # Convert the query_bundle into a hashable representation
+    # This is a placeholder function and should be adapted to the structure of QueryBundle
+    return str(query_bundle)
 
 class CustomRetriever(BaseRetriever):
     def __init__(self, vector_retriever, postprocessor=None):
@@ -13,7 +19,14 @@ class CustomRetriever(BaseRetriever):
         self._postprocessor = postprocessor or CohereRerank(top_n=5)
         super().__init__()
 
-    @lru_cache(maxsize=128)
+    def _retrieve_with_cache(self, hashable_query):
+        # Convert the hashable query back to the original query_bundle
+        # This is a placeholder function and should be adapted to the structure of QueryBundle
+        query_bundle = eval(hashable_query)
+        return self._retrieve(query_bundle)
+
+    _retrieve_with_cache = lru_cache(maxsize=128)(_retrieve_with_cache)
+
     def _retrieve(self, query_bundle):
         retrieved_nodes = self._vector_retriever.retrieve(query_bundle)
         filtered_nodes = self._postprocessor.postprocess_nodes(
@@ -29,7 +42,8 @@ class CustomObjectRetriever(ObjectRetriever):
         self._llm = llm  # Add your logic for llm initialization
 
     def retrieve(self, query_bundle):
-        nodes = self._retriever.retrieve(query_bundle)
+        hashable_query = hashable_query_bundle(query_bundle)
+        nodes = self._retriever._retrieve_with_cache(hashable_query)
         tools = [self._object_node_mapping.from_node(n.node) for n in nodes]
 
         sub_question_engine = SubQuestionQueryEngine.from_defaults(
