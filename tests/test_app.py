@@ -12,14 +12,18 @@ def main():
     # Initialize QueryManager with the DocumentProcessor instance
     query_manager = QueryManager(llm_instance, embedding_instance, document_processor)
     query_manager.build_tools()
+    start_time = time.time()
     master_agent = query_manager.get_answer()
 
+    end_time = time.time()
     # Submit a text query
     query_text = "list all centers"
     response = master_agent.query(query_text)
 
     # Print the response to verify the output
     print(f"Response to query '{query_text}': {response}")
+    print(f"Cache used: {query_manager.cache_used}")
+    print(f"Time taken: {end_time - start_time} seconds")
 
 
 if __name__ == "__main__":

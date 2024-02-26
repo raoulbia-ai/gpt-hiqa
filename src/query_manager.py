@@ -31,7 +31,6 @@ class QueryManager:
             self.all_tools.append(doc_tool)
 
     def get_answer(self):
-        start_time = time.time()
         if not self._cached_master_agent:
             self.cache_used = False
             tool_mapping = SimpleToolNodeMapping.from_objects(self.all_tools)
@@ -74,7 +73,4 @@ class QueryManager:
             )
         else:
             self.cache_used = True
-        end_time = time.time()
-        print(f"Cache used: {self.cache_used}")
-        print(f"Time taken: {end_time - start_time} seconds")
         return self._cached_master_agent
