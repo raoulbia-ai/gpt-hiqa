@@ -45,11 +45,14 @@ def main():
     user_input = st.text_input("Enter your question:", key='question_input')
 
     if st.button('➡️'):
-        handle_input(st.session_state.conversation, user_input)
+        time_taken = handle_input(st.session_state.conversation, user_input)
 
     # Display conversation
     for speaker, text in st.session_state.conversation:
+        st.write(f"**Cache used:** {cache_used}")
+        st.write(f"**Time taken:** {time_taken:.2f} seconds")
         st.write(f"{speaker}: {text}")
+
 
 
 def handle_input(conversation, user_input):
@@ -70,24 +73,25 @@ def handle_input(conversation, user_input):
         # Display timing and cache usage information separately
         # Calculate timing and cache usage information
         cache_used = st.session_state['query_manager'].cache_used
-        time_taken = end_time - start_time
+        time_taken, cache_used = end_time - start_time
 
         # Add answer and timing information to conversation
-        response_with_timing = f"{response}\n(Cache used: {cache_used}, Time taken: {time_taken:.2f} seconds)"
-        conversation.append(("AI", response_with_timing))
+        # response_with_timing = f"{response}\n(Cache used: {cache_used}, Time taken: {time_taken:.2f} seconds)"
+        # conversation.append(("AI", response_with_timing))
 
         # Add answer to conversation
         conversation.append(("AI", response))
         # Display timing and cache usage information
         cache_used = st.session_state['query_manager'].cache_used
         time_taken = end_time - start_time
-        st.markdown(f"**Cache used:** {cache_used}")
-        st.markdown(f"**Time taken:** {time_taken:.2f} seconds")
 
         # Clear input box
         st.session_state['processing'] = False
         # Reset cache_used attribute for the next query
         st.session_state['query_manager'].cache_used = False
+
+        return time_taken, cache_used
+
 
 if __name__ == '__main__':
     main()
