@@ -3,6 +3,7 @@ from gptcache import GPTCache
 from src.document_processor import DocumentProcessor  # Adjust import path as necessary
 from src.query_manager import QueryManager  # Adjust import path as necessary
 from config import llm_instance, embedding_instance
+import time
 
 # Initialize session state once
 if 'user_input' not in st.session_state:
@@ -59,11 +60,18 @@ def handle_input(conversation, user_input):
 
         st.session_state['processing'] = True
 
+        start_time = time.time()
         with st.spinner('Processing...'):
             response = st.session_state['query_manager'].get_answer().query(user_input)
+        end_time = time.time()
 
         # Add answer to conversation
         conversation.append(("AI", response))
+        # Display timing and cache usage information
+        cache_used = st.session_state['query_manager'].cache_used
+        time_taken = end_time - start_time
+        st.write(f"Cache used: {cache_used}")
+        st.write(f"Time taken: {time_taken:.2f} seconds")
         # Clear input box
         st.session_state['processing'] = False
 
