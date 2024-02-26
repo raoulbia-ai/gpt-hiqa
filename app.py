@@ -64,6 +64,14 @@ def handle_input(conversation, user_input):
             response = st.session_state['query_manager'].get_answer().query(user_input)
         end_time = time.time()
 
+        # Calculate timing and cache usage information
+        cache_used = st.session_state['query_manager'].cache_used
+        time_taken = end_time - start_time
+
+        # Add answer and timing information to conversation
+        response_with_timing = f"{response}\n(Cache used: {cache_used}, Time taken: {time_taken:.2f} seconds)"
+        conversation.append(("AI", response_with_timing))
+
         # Add answer to conversation
         conversation.append(("AI", response))
         # Display timing and cache usage information
