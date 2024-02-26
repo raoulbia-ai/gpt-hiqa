@@ -1,5 +1,6 @@
 from config import COHERE_API_KEY
 from llama_index.core.retrievers import BaseRetriever
+from functools import lru_cache
 from llama_index.postprocessor.cohere_rerank import CohereRerank
 from llama_index.core.objects import ObjectRetriever
 from llama_index.core.tools import QueryEngineTool, ToolMetadata
@@ -12,6 +13,7 @@ class CustomRetriever(BaseRetriever):
         self._postprocessor = postprocessor or CohereRerank(top_n=5)
         super().__init__()
 
+    @lru_cache(maxsize=128)
     def _retrieve(self, query_bundle):
         retrieved_nodes = self._vector_retriever.retrieve(query_bundle)
         filtered_nodes = self._postprocessor.postprocess_nodes(
