@@ -73,6 +73,13 @@ def handle_input(conversation, user_input):
         # Display timing and cache usage information separately
         # Calculate timing and cache usage information
         cache_used = st.session_state['query_manager'].cache_used
+        time_taken = end_time - start_time
+
+        # The above line is removed as it is incorrect
+        # Reset cache_used attribute for the next query
+        st.session_state['query_manager'].cache_used = False
+
+        return time_taken, cache_used
         time_taken, cache_used = end_time - start_time
 
         # Add answer and timing information to conversation
