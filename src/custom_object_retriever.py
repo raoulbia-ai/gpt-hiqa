@@ -12,6 +12,18 @@ def hashable_query_bundle(query_bundle):
     # Convert the query_bundle into a hashable representation
     # This is a placeholder function and should be adapted to the structure of QueryBundle
     return str(query_bundle)
+from functools import lru_cache
+
+def serialize_query_bundle(query_bundle):
+    # Serialize the query_bundle into a string representation
+    # This is a placeholder function and should be adapted to the structure of QueryBundle
+    return repr(query_bundle)
+
+def deserialize_query_bundle(serialized_query):
+    # Deserialize the string representation back into a QueryBundle object
+    # This is a placeholder function and should be adapted to the structure of QueryBundle
+    # Example: return QueryBundle.from_serialized(serialized_query)
+    raise NotImplementedError("Deserialization method needs to be implemented")
 
 class CustomRetriever(BaseRetriever):
     def __init__(self, vector_retriever, postprocessor=None):
@@ -23,6 +35,8 @@ class CustomRetriever(BaseRetriever):
         # Convert the hashable query back to the original query_bundle
         # This is a placeholder function and should be adapted to the structure of QueryBundle
         query_bundle = eval(hashable_query)
+    def _retrieve_with_cache(self, serialized_query):
+        query_bundle = deserialize_query_bundle(serialized_query)
         return self._retrieve(query_bundle)
 
     _retrieve_with_cache = lru_cache(maxsize=128)(_retrieve_with_cache)
@@ -42,8 +56,8 @@ class CustomObjectRetriever(ObjectRetriever):
         self._llm = llm  # Add your logic for llm initialization
 
     def retrieve(self, query_bundle):
-        hashable_query = hashable_query_bundle(query_bundle)
-        nodes = self._retriever._retrieve_with_cache(hashable_query)
+        serialized_query = serialize_query_bundle(query_bundle)
+        nodes = self._retriever._retrieve_with_cache(serialized_query)
         tools = [self._object_node_mapping.from_node(n.node) for n in nodes]
 
         sub_question_engine = SubQuestionQueryEngine.from_defaults(
