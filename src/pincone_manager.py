@@ -6,21 +6,11 @@ from config import PINECONE_API_KEY, PINECONE_ENV
 
 
 class PineconeManager:
-    def __init__(self, index_name: str
-                 , dimension: int = 1536  # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-                 , metric: str = 'cosine'
-                 , cloud: str = 'aws',
+    def __init__(self, index_name: str, dimension: int = 1536, metric: str = 'cosine', cloud: str = 'aws',
                  region: str = PINECONE_ENV):
-        """
-        Initialize the Pinecone Vector Index using the updated Pinecone API.
 
-        :param index_name: Name of the Pinecone index.
-        :param dimension: Dimension of the vectors.
-        :param metric: Metric to use for the index.
-        :param cloud: Cloud provider for the Pinecone service.
-        :param region: Cloud region for the Pinecone service.
-        """
         # Initialize a Pinecone instance with your API key
+        # super().__init__(**kwargs)
         self.pc = Pinecone(api_key=PINECONE_API_KEY)
         # self.index = self.pc.Index(index_name)
 
@@ -77,7 +67,7 @@ if __name__ == "__main__":
     # Example vector to upsert
     # example_vectors = [{"id": "vector1", "values": [0.1, 0.2, 0.3, ..., 0.768]}]  # Adjust the dimension as necessary
 
-    vector_index.upsert(vectors=example_vectors)
+    # vector_index.upsert(vectors=example_vectors)
     #
     # # Query the index
     # query_result = vector_index.query(vector=[0.1, 0.2, 0.3, ..., 0.768], top_k=5)
