@@ -20,6 +20,7 @@ def set_session_state(**kwargs):
     for key, value in kwargs.items():
         st.session_state[key] = value
 
+
 def initialize():
     if 'initialized' not in st.session_state:
         st.session_state.doc_processor = DocumentProcessor(llm_instance, embedding_instance)
@@ -32,6 +33,7 @@ def initialize():
         st.session_state.query_manager.build_tools()
         # Mark as initialized to prevent re-initialization in the same session
         st.session_state.initialized = True
+
 
 def main():
     st.markdown("# HIQA Inspection Reports Q&A")
@@ -52,7 +54,6 @@ def main():
         st.write(f"**Cache used:** {cache_used}")
         st.write(f"**Time taken:** {time_taken:.2f} seconds")
         st.write(f"{speaker}: {text}")
-
 
 
 def handle_input(conversation, user_input):
