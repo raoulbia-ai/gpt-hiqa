@@ -1,17 +1,15 @@
 from llama_index.llms.openai import OpenAI
 from llama_index.embeddings.openai import OpenAIEmbedding
 from dotenv import load_dotenv, find_dotenv
-import pinecone
 import os
 
 load_dotenv(find_dotenv(), override=True)
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 COHERE_API_KEY = os.getenv("COHERE_API_KEY")
+HF_TOKEN = os.getenv("HUGGINGFACEHUB_API_TOKEN")
 PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
 PINECONE_ENV = os.getenv("PINECONE_ENV")
-pinecone.init(api_key=PINECONE_API_KEY, environment=PINECONE_ENV)
-
 
 
 # Initialize shared instances

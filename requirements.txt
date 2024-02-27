@@ -9,4 +9,7 @@ llama-index-agent-openai-legacy
 llama-index-postprocessor-cohere-rerank
 llama-index-llms-huggingface
 transformers
+sentence_transformers
 pinecone-client
+numpy
+llama-index-embeddings-nomic

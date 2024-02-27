@@ -1,15 +1,16 @@
-from pinecone import Pinecone, ServerlessSpec
+from pinecone import Pinecone, ServerlessSpec, PodSpec
 from typing import List, Dict
 from config import PINECONE_API_KEY, PINECONE_ENV
 
-from pinecone import Pinecone, ServerlessSpec
-from typing import List, Dict
-from config import PINECONE_API_KEY, PINECONE_ENV  # Assuming these are defined in your config.py
+# PINECONE_ENV = 'us-west-2'
 
 
-class VectorIndex:
-    def __init__(self, index_name: str, dimension: int = 768, metric: str = 'cosine', cloud: str = 'aws',
-                 region: str = 'us-west-2'):
+class PineconeManager:
+    def __init__(self, index_name: str
+                 , dimension: int = 1536  # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+                 , metric: str = 'cosine'
+                 , cloud: str = 'aws',
+                 region: str = PINECONE_ENV):
         """
         Initialize the Pinecone Vector Index using the updated Pinecone API.
 
@@ -21,14 +22,19 @@ class VectorIndex:
         """
         # Initialize a Pinecone instance with your API key
         self.pc = Pinecone(api_key=PINECONE_API_KEY)
+        # self.index = self.pc.Index(index_name)
 
         # Check if the index exists, and create it if it does not
-        if index_name not in self.pc.list_indexes().names:
+        if index_name not in self.pc.list_indexes().names():
             self.pc.create_index(
                 name=index_name,
                 dimension=dimension,
                 metric=metric,
-                spec=ServerlessSpec(cloud=cloud, region=region)
+                # spec=ServerlessSpec(cloud=cloud, region=region)
+                spec=PodSpec(
+                    environment=PINECONE_ENV, #"us-west1-gcp",
+                    pod_type="p1.x1",
+                    pods=1)
             )
 
         # Connect to the index
@@ -63,14 +69,15 @@ class VectorIndex:
 
 # Example usage
 if __name__ == "__main__":
-    INDEX_NAME = "your_index_name"
+    INDEX_NAME = "my-test-index"
 
     # Instantiate the VectorIndex
-    vector_index = VectorIndex(index_name=INDEX_NAME)
+    vector_index = PineconeManager(INDEX_NAME)
 
-    # # Example vector to upsert
+    # Example vector to upsert
     # example_vectors = [{"id": "vector1", "values": [0.1, 0.2, 0.3, ..., 0.768]}]  # Adjust the dimension as necessary
-    # vector_index.upsert(vectors=example_vectors)
+
+    vector_index.upsert(vectors=example_vectors)
     #
     # # Query the index
     # query_result = vector_index.query(vector=[0.1, 0.2, 0.3, ..., 0.768], top_k=5)
