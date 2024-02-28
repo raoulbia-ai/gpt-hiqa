@@ -9,6 +9,6 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 COHERE_API_KEY = os.getenv("COHERE_API_KEY")
 
 # Initialize shared instances
-llm_instance = OpenAI(temperature=0, model="gpt-4")
-# llm_instance = OpenAI(temperature=0, model="gpt-3.5-turbo")
+# llm_instance = OpenAI(temperature=0, model="gpt-4")
+llm_instance = OpenAI(temperature=0, model="gpt-3.5-turbo")
 embedding_instance = OpenAIEmbedding(model="text-embedding-3-large")

@@ -10,7 +10,7 @@ from llama_index.core import Settings
 from llama_index.llms.openai import OpenAI
 from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.agent.openai import OpenAIAgent
-from llama_index.llms.azure_openai import AzureOpenAI
+# from llama_index.llms.azure_openai import AzureOpenAI
 
 class DocumentProcessor:
     def __init__(self, llm, embed_model, documents_dir='data/hiqa_pdfs'):
