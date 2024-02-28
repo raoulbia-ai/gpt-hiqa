@@ -13,11 +13,13 @@ class QueryManager:
         self.document_processor = document_processor
         self.llm = llm
         self.embed_model = embed_model
+        self.agents_dict = document_processor.agents_dict
         self.all_tools = []
 
 
     def build_tools(self):
-        for file_base, agent in self.document_processor.agents_dict.items():
+        for file_base, agent in self.agents_dict.items():
+            print(f"query manager: building tool for {file_base}")
             # summary = self.document_processor.extra_info_dict[file_base]["summary"]
             doc_tool = QueryEngineTool(
                 query_engine=agent,
@@ -38,10 +40,13 @@ class QueryManager:
             )
         vector_node_retriever = obj_index.as_node_retriever(similarity_top_k=10)
 
-        custom_node_retriever = CustomRetriever(vector_node_retriever)
+        custom_node_retriever = CustomRetriever(vector_node_retriever, self.all_tools)
 
         custom_obj_retriever = CustomObjectRetriever(
-            custom_node_retriever, tool_mapping, self.all_tools, llm=self.llm
+            custom_node_retriever,
+            tool_mapping,
+            self.all_tools,
+            llm=self.llm
         )
         master_agent = FnRetrieverOpenAIAgent.from_retriever(
             custom_obj_retriever,
@@ -68,5 +73,6 @@ class QueryManager:
                     """,
             llm=self.llm,
             verbose=True,
+            all_tools=self.all_tools
         )
         return master_agent

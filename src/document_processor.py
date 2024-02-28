@@ -47,6 +47,7 @@ class DocumentProcessor:
         self.pc_vector_store = PineconeVectorStore(api_key=PINECONE_API_KEY,
                                                    environment=PINECONE_ENV,
                                                    index_name=self.index_name)
+        # self.pc_vector_index = VectorStoreIndex
         self.id_to_text_map = {}
 
         self.node_parser = SentenceSplitter(
@@ -72,103 +73,12 @@ class DocumentProcessor:
             except Exception as e:
                 print(f"Error loading document: {title}. Error: {str(e)}")
 
-    def build_agent_per_docOLD(self, nodes, file_base):
-        # print(f'file_base: {file_base}')
-
-        # persist or load vector index
-        vi_out_path = f"persist/{file_base}"
-        summary_out_path = f"persist/{file_base}_summary.pkl"
-        if not os.path.exists(vi_out_path):
-            Path("persist/").mkdir(parents=True, exist_ok=True)
-            # build vector index
-            vector_index = VectorStoreIndex(nodes)
-            vector_index.storage_context.persist(persist_dir=vi_out_path)
-        else:
-            vector_index = load_index_from_storage(
-                StorageContext.from_defaults(persist_dir=vi_out_path),
-            )
-
-        # build summary index
-        summary_index = SummaryIndex(nodes)
-
-        # define query engines
-        # https://colab.research.google.com/drive/1ZAdrabTJmZ_etDp10rjij_zME2Q3umAQ?usp=sharing#scrollTo=aCdR2_wmNol6
-        vector_query_engine = vector_index.as_query_engine(
-            response_mode="compact",
-            llm=self.llm)
-        summary_query_engine = summary_index.as_query_engine(
-            response_mode="compact", #"tree_summarize",     # <<<<<<<<<<<<<<<<  look up difference (see also "refine")
-            llm=self.llm
-        )
-
-        # extract a summary
-        if not os.path.exists(summary_out_path):
-            Path(summary_out_path).parent.mkdir(parents=True, exist_ok=True)
-            summary = str(
-                summary_query_engine.aquery(
-                    "Extract a concise 1-2 sentence summary of this document."
-                )
-            )
-            pickle.dump(summary, open(summary_out_path, "wb"))
-        else:
-            summary = pickle.load(open(summary_out_path, "rb"))
-
-        # define tools
-        query_engine_tools = [
-            QueryEngineTool(
-                query_engine=vector_query_engine,
-                metadata=ToolMetadata(
-                    name=f"{file_base}",
-                    description=f"Useful for questions related to specific facts about {file_base} ",
-                ),
-            ),
-            QueryEngineTool(
-                query_engine=summary_query_engine,
-                metadata=ToolMetadata(
-                    name=f"{file_base}",
-                    description=f"Useful for summarization questions",
-                ),
-            ),
-        ]
-
-        # build agent
-        # function_llm = OpenAI(model=self.model)
-        agent = OpenAIAgent.from_tools(
-            query_engine_tools,
-            llm=self.llm, #function_llm,
-            verbose=True,
-            system_prompt=f"""
-                                You are a specialized agent designed to answer queries about the {file_base} document.
-                                You must ALWAYS use at least one of the tools provided when answering a question; 
-                                do NOT rely on prior knowledge.\
-                                """,
-        )
-
-        return agent, summary
-
-    def build_agentsOLD(self):
-        node_parser = SentenceSplitter(
-                                        # chunk_size=1024,
-                                        # chunk_overlap=20
-                                        )
-        for doc in self.documents:
-            nodes = node_parser.get_nodes_from_documents([doc])
-
-            self.embed_nodes_in_pinecone_index(nodes)  # <<<<<<<<<<<< NEW
-
-            file_path = Path(doc.metadata["path"])
-            file_base = str(file_path.stem)
-            agent, summary = self.build_openai_agent_per_doc_from_pinecone(nodes, file_base)
-
-            self.agents_dict[file_base] = agent
-            self.extra_info_dict[file_base] = {"summary": summary, "nodes": nodes}
-
     def build_openai_agent_per_doc_from_pinecone(self, nodes, file_base):
-        print(f'building OpenAI agent (with query engines) for: {file_base}')
+        print(f'doc processor building OpenAI agent (with query engines) for: {file_base}')
 
         # PINECONE
-        vector_store = self.pc_vector_store
-        storage_context = StorageContext.from_defaults(vector_store=vector_store)
+        # vector_store = self.pc_vector_store  # IS A PineconeVectorStore
+        storage_context = StorageContext.from_defaults(vector_store=self.pc_vector_store)
         vector_index = VectorStoreIndex.from_documents(
             self.documents,
             storage_context=storage_context

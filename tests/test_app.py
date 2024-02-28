@@ -23,8 +23,8 @@ MODEL = "text-embedding-ada-002"
 
 
 # IF we need an embedding of dim 768 hence then we can use all-mpnet-base-v2
-tokenizer = AutoTokenizer.from_pretrained("sentence-transformers/all-mpnet-base-v2", token=HF_TOKEN)
-model = SentenceTransformer("sentence-transformers/all-mpnet-base-v2", token=HF_TOKEN)
+# tokenizer = AutoTokenizer.from_pretrained("sentence-transformers/all-mpnet-base-v2", token=HF_TOKEN)
+# model = SentenceTransformer("sentence-transformers/all-mpnet-base-v2", token=HF_TOKEN)
 
 # pc = PineconeManager(index_name="my-test-index")
 
@@ -107,7 +107,7 @@ def main():
     query_manager.build_tools()
     master_agent = query_manager.get_answer()
     query_text = "list all centers"
-    # query_text = "summarise report findings for sun beam lodge"
+    query_text = "Please provide a list of Leitrim centres who have been not compliant with the fire precatuion regulation."
     response = master_agent.query(query_text)
     print(f"Response to query '{query_text}': {response}")
 
