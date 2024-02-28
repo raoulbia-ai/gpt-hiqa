@@ -56,13 +56,17 @@ class PineconeManager:
         """
         self.index.delete(ids=vector_ids)
 
+    def list_indeces(self):
+        return self.pc.list_indexes()
+
 
 # Example usage
 if __name__ == "__main__":
-    INDEX_NAME = "my-test-index"
+    pass
+    # INDEX_NAME = "my-test-index"
 
     # Instantiate the VectorIndex
-    vector_index = PineconeManager(INDEX_NAME)
+    # vector_index = PineconeManager(INDEX_NAME)
 
     # Example vector to upsert
     # example_vectors = [{"id": "vector1", "values": [0.1, 0.2, 0.3, ..., 0.768]}]  # Adjust the dimension as necessary

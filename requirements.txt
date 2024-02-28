@@ -12,4 +12,6 @@ transformers
 sentence_transformers
 pinecone-client
 numpy
-llama-index-embeddings-nomic
+openai
+llama-index-readers-pinecone
+llama-index-vector-stores-pinecone

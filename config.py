@@ -17,4 +17,5 @@ llm_instance = OpenAI(temperature=0, model="gpt-3.5-turbo")
 embedding_instance = OpenAIEmbedding(model="text-embedding-ada-002")
 
 # llm_instance = OpenAI(temperature=0, model="gpt-4")
-# embedding_instance = OpenAIEmbedding(model="text-embedding-3-large")
+# embedding_instance = OpenAIEmbedding(model="text-embedding-3-small")
+
