@@ -2,6 +2,7 @@ import streamlit as st
 from src.document_processor import DocumentProcessor  # Adjust import path as necessary
 from src.query_manager import QueryManager  # Adjust import path as necessary
 from config import llm_instance, embedding_instance
+import time
 
 # Initialize session state once
 if 'user_input' not in st.session_state:
@@ -30,6 +31,7 @@ def initialize():
         # Initialize the QueryManager with the DocumentProcessor instance
         st.session_state.query_manager = QueryManager(llm_instance, embedding_instance, st.session_state.doc_processor)
         st.session_state.query_manager.build_tools()
+        time.sleep(5)
         # Mark as initialized to prevent re-initialization in the same session
         st.session_state.initialized = True
 

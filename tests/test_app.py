@@ -105,9 +105,11 @@ def main():
     # Initialize QueryManager with the DocumentProcessor instance
     query_manager = QueryManager(llm_instance, embedding_instance, document_processor)
     query_manager.build_tools()
+    time.sleep(5)
     master_agent = query_manager.get_answer()
     query_text = "list all centers"
     query_text = "Please provide a list of Leitrim centres who have been not compliant with the fire precatuion regulation."
+    query_text = "Please provide a list of centres who have been not compliant with the fire precatuion regulation."
     response = master_agent.query(query_text)
     print(f"Response to query '{query_text}': {response}")
 

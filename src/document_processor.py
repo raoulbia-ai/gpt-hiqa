@@ -41,8 +41,8 @@ class DocumentProcessor:
         self.EMBED_MODEL = "text-embedding-ada-002"
 
         # we need an embedding of dim 768 hence we use all-mpnet-base-v2
-        self.tokenizer = AutoTokenizer.from_pretrained("sentence-transformers/all-mpnet-base-v2", use_auth_token=HF_TOKEN)
-        self.model = SentenceTransformer("sentence-transformers/all-mpnet-base-v2", use_auth_token=HF_TOKEN)
+        # self.tokenizer = AutoTokenizer.from_pretrained("sentence-transformers/all-mpnet-base-v2", use_auth_token=HF_TOKEN)
+        # self.model = SentenceTransformer("sentence-transformers/all-mpnet-base-v2", use_auth_token=HF_TOKEN)
         self.pc = PineconeManager(index_name=self.index_name)
         self.pc_vector_store = PineconeVectorStore(api_key=PINECONE_API_KEY,
                                                    environment=PINECONE_ENV,
@@ -58,7 +58,7 @@ class DocumentProcessor:
 
     def load_documents(self):
 
-        for title in self.titles:
+        for title in sorted(self.titles):
             try:
                 doc = SimpleDirectoryReader(
                     input_files=[f"{self.documents_dir}/{title}.pdf"]
@@ -85,7 +85,7 @@ class DocumentProcessor:
         )
 
         # build summary index
-        summary_index = SummaryIndex(nodes)
+        summary_index = SummaryIndex(nodes, service_context=)
 
         # define query engines
         vector_query_engine = vector_index.as_query_engine(
