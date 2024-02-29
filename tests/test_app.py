@@ -1,7 +1,7 @@
 from src.document_processor import DocumentProcessor
 from src.query_manager import QueryManager
 from config import llm_instance, embedding_instance, HF_TOKEN
-from src.pincone_manager import PineconeManager
+# from src.pincone_manager import PineconeManager
 from transformers import AutoTokenizer
 from sentence_transformers import SentenceTransformer
 from llama_index.embeddings.openai import OpenAIEmbedding
@@ -22,19 +22,16 @@ client = OpenAI()
 MODEL = "text-embedding-ada-002"
 
 
-# we need an embedding of dim 768 hence we use all-mpnet-base-v2
-tokenizer = AutoTokenizer.from_pretrained("sentence-transformers/all-mpnet-base-v2", use_auth_token=HF_TOKEN)
-model = SentenceTransformer("sentence-transformers/all-mpnet-base-v2", use_auth_token=HF_TOKEN)
+# IF we need an embedding of dim 768 hence then we can use all-mpnet-base-v2
+# tokenizer = AutoTokenizer.from_pretrained("sentence-transformers/all-mpnet-base-v2", token=HF_TOKEN)
+# model = SentenceTransformer("sentence-transformers/all-mpnet-base-v2", token=HF_TOKEN)
 
-pc = PineconeManager(index_name="my-test-index")
+# pc = PineconeManager(index_name="my-test-index")
 
 # def insert_embeddings(index_name, embeddings):
 #    vectorstore = pc_manager.query(index_name, embeddings)
 #    vectorstore = pc_manager.upsert(chunks, embeddings, index_name=index_name)
 #    return vectorstore
-
-line = "Sample document text goes here"
-
 
 def encode_question(question_text):
     # Directly encode the question text to embeddings
@@ -43,10 +40,10 @@ def encode_question(question_text):
     # embeddings = embed_model.get_text_embedding(question_text)
 
     embeddings = client.embeddings.create(
-        input=[line], model=MODEL
+        input=[question_text], model=MODEL
     )
-    embeddings = [record.embedding for record in embeddings.data]
-    return embeddings
+    query_embedding = [record.embedding for record in embeddings.data]
+    return query_embedding
 
 
 def get_or_create_answer(query_manager, question_text):
@@ -98,28 +95,36 @@ def get_or_create_answer(query_manager, question_text):
 
 def main():
 
-
+    index_name = "hiqa-index"
     # Initialize the DocumentProcessor and process documents
     document_processor = DocumentProcessor(llm_instance, embedding_instance)
     document_processor.load_documents()  # Ensure this method is implemented to load your documents
+    # document_processor.embed_nodes_in_pinecone_index()
     document_processor.build_agents()
 
     # Initialize QueryManager with the DocumentProcessor instance
     query_manager = QueryManager(llm_instance, embedding_instance, document_processor)
     query_manager.build_tools()
 
-    start_time = time.time()
-
-    # Submit a text query
+    master_agent = query_manager.get_answer()
     query_text = "list all centers"
-    query_text = "what time is it?"
-    response = get_or_create_answer(query_manager, query_text)
-    print(response)
+    query_text = "Please provide a list of Leitrim centres who have been not compliant with the fire precatuion regulation."
+    # query_text = "Please provide a list of centres who have been not compliant with the fire precatuion regulation."
+    response = master_agent.query(query_text)
+    print(f"Response to query '{response}")
 
-    end_time = time.time()
-    elapsed_time = end_time - start_time
-    minutes, seconds = divmod(elapsed_time, 60)
-    print(f"Execution time: {int(minutes)} minutes {int(seconds)} seconds")
+
+    # start_time = time.time()
+    # # Submit a text query
+    # query_text = "list all centers"
+    # query_text = "what time is it?"
+    # response = get_or_create_answer(query_manager, query_text)
+    # print(response)
+
+    # end_time = time.time()
+    # elapsed_time = end_time - start_time
+    # minutes, seconds = divmod(elapsed_time, 60)
+    # print(f"Execution time: {int(minutes)} minutes {int(seconds)} seconds")
 
 if __name__ == "__main__":
     main()
