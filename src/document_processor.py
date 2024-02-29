@@ -67,9 +67,13 @@ class DocumentProcessor:
         summary_index = SummaryIndex(nodes)
 
         # define query engines
-        vector_query_engine = vector_index.as_query_engine(llm=self.llm)
+        # https://colab.research.google.com/drive/1ZAdrabTJmZ_etDp10rjij_zME2Q3umAQ?usp=sharing#scrollTo=aCdR2_wmNol6
+        vector_query_engine = vector_index.as_query_engine(
+            response_mode="compact",
+            llm=self.llm)
         summary_query_engine = summary_index.as_query_engine(
-            response_mode="tree_summarize", llm=self.llm
+            response_mode="compact", #"tree_summarize",     # <<<<<<<<<<<<<<<<  look up difference (see also "refine")
+            llm=self.llm
         )
 
         # extract a summary
