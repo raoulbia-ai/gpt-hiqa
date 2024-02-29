@@ -1,7 +1,7 @@
 .idea
 src/__pycache__/
 __pycache__/
-+.pyc
+*.pyc
 .history
 data/
 .env
