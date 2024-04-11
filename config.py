@@ -19,4 +19,3 @@ PINECONE_ENV = os.getenv("PINECONE_ENV")
 llm_instance = OpenAI(temperature=0, model="gpt-4")
 # embedding_instance = OpenAIEmbedding(model="text-embedding-3-small")
 embedding_instance = OpenAIEmbedding(model="text-embedding-ada-002")
-

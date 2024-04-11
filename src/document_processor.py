@@ -1,19 +1,28 @@
 import os
+import json
 import pickle
 from pathlib import Path
-from config import OPENAI_API_KEY
+from config import OPENAI_API_KEY, PINECONE_API_KEY, PINECONE_ENV
 from llama_index.core import SimpleDirectoryReader, Document, VectorStoreIndex, SummaryIndex
 from llama_index.core import load_index_from_storage, StorageContext
 from llama_index.core.node_parser import SentenceSplitter
 from llama_index.core.tools import QueryEngineTool, ToolMetadata
 from llama_index.core import Settings
-from llama_index.llms.openai import OpenAI
+# from llama_index.llms.openai import OpenAI
+from openai import OpenAI
 from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.agent.openai import OpenAIAgent
+from config import HF_TOKEN
+from src.pincone_manager import PineconeManager
+from transformers import AutoTokenizer
+from sentence_transformers import SentenceTransformer
 # from llama_index.llms.azure_openai import AzureOpenAI
+from llama_index.readers.pinecone import PineconeReader
+from llama_index.vector_stores.pinecone import PineconeVectorStore
 
 class DocumentProcessor:
-    def __init__(self, llm, embed_model, documents_dir='data/hiqa_pdfs'):
+    def __init__(self, llm, embed_model, index_name, documents_dir='data/hiqa_pdfs'):
+        self.index_name = index_name
         self.documents_dir = documents_dir
         self.documents = []
         self.agents_dict = {}
@@ -27,9 +36,29 @@ class DocumentProcessor:
         data_dir_path = Path(self.documents_dir)
         self.titles = [file_path.stem for file_path in data_dir_path.glob('*.pdf')]
 
+        self.client = OpenAI()
+        # text-embedding-ada-002 produces vectors with 1536 dimensions
+        self.EMBED_MODEL = "text-embedding-ada-002"
+
+        # we need an embedding of dim 768 hence we use all-mpnet-base-v2
+        # self.tokenizer = AutoTokenizer.from_pretrained("sentence-transformers/all-mpnet-base-v2", use_auth_token=HF_TOKEN)
+        # self.model = SentenceTransformer("sentence-transformers/all-mpnet-base-v2", use_auth_token=HF_TOKEN)
+        self.pc = PineconeManager(index_name=self.index_name)
+        self.pc_vector_store = PineconeVectorStore(api_key=PINECONE_API_KEY,
+                                                   environment=PINECONE_ENV,
+                                                   index_name=self.index_name)
+        # self.pc_vector_index = VectorStoreIndex
+        self.id_to_text_map = {}
+
+        self.node_parser = SentenceSplitter(
+                                            # chunk_size=1024,
+                                            # chunk_overlap=20
+                                            )
+        # self.nodes = None
+
     def load_documents(self):
 
-        for title in self.titles:
+        for title in sorted(self.titles):
             try:
                 doc = SimpleDirectoryReader(
                     input_files=[f"{self.documents_dir}/{title}.pdf"]
@@ -44,49 +73,40 @@ class DocumentProcessor:
             except Exception as e:
                 print(f"Error loading document: {title}. Error: {str(e)}")
 
-    def extract_text_from_pdf(self, file_path):
-        # Existing extract_text_from_pdf implementation
-        pass
+    def build_openai_agent_per_doc_from_pinecone(self, nodes, file_base):
+        print(f'doc processor building OpenAI agent (with query engines) for: {file_base}')
 
-    def build_agent_per_doc(self, nodes, file_base):
-        # print(f'file_base: {file_base}')
-
-        vi_out_path = f"persist/{file_base}"
-        summary_out_path = f"persist/{file_base}_summary.pkl"
-        if not os.path.exists(vi_out_path):
-            Path("persist/").mkdir(parents=True, exist_ok=True)
-            # build vector index
-            vector_index = VectorStoreIndex(nodes)
-            vector_index.storage_context.persist(persist_dir=vi_out_path)
-        else:
-            vector_index = load_index_from_storage(
-                StorageContext.from_defaults(persist_dir=vi_out_path),
-            )
+        # PINECONE
+        # vector_store = self.pc_vector_store  # IS A PineconeVectorStore
+        storage_context = StorageContext.from_defaults(vector_store=self.pc_vector_store)
+        vector_index = VectorStoreIndex.from_documents(
+            self.documents,
+            storage_context=storage_context
+        )
 
         # build summary index
-        summary_index = SummaryIndex(nodes)
+        summary_index = SummaryIndex(nodes, service_context=)
 
         # define query engines
-        # https://colab.research.google.com/drive/1ZAdrabTJmZ_etDp10rjij_zME2Q3umAQ?usp=sharing#scrollTo=aCdR2_wmNol6
         vector_query_engine = vector_index.as_query_engine(
             response_mode="compact",
             llm=self.llm)
         summary_query_engine = summary_index.as_query_engine(
-            response_mode="compact", #"tree_summarize",     # <<<<<<<<<<<<<<<<  look up difference (see also "refine")
+            response_mode="compact",  # "tree_summarize",     # <<<<<<<<<<<<<<<<  look up difference (see also "refine")
             llm=self.llm
         )
 
-        # extract a summary
-        if not os.path.exists(summary_out_path):
-            Path(summary_out_path).parent.mkdir(parents=True, exist_ok=True)
-            summary = str(
-                summary_query_engine.aquery(
-                    "Extract a concise 1-2 sentence summary of this document."
-                )
-            )
-            pickle.dump(summary, open(summary_out_path, "wb"))
-        else:
-            summary = pickle.load(open(summary_out_path, "rb"))
+        # # extract a summary
+        # if not os.path.exists(summary_out_path):
+        #     Path(summary_out_path).parent.mkdir(parents=True, exist_ok=True)
+        #     summary = str(
+        #         summary_query_engine.aquery(
+        #             "Extract a concise 1-2 sentence summary of this document."
+        #         )
+        #     )
+        #     pickle.dump(summary, open(summary_out_path, "wb"))
+        # else:
+        #     summary = pickle.load(open(summary_out_path, "rb"))
 
         # define tools
         query_engine_tools = [
@@ -119,17 +139,42 @@ class DocumentProcessor:
                                 """,
         )
 
-        return agent, summary
+        return agent #, summary
 
     def build_agents(self):
-        node_parser = SentenceSplitter()
         for doc in self.documents:
-            nodes = node_parser.get_nodes_from_documents([doc])
+            nodes = self.node_parser.get_nodes_from_documents([doc])
             file_path = Path(doc.metadata["path"])
+            print(f'Path(doc.metadata["path"]): {file_path}')
             file_base = str(file_path.stem)
-            agent, summary = self.build_agent_per_doc(nodes, file_base)
+            agent = self.build_openai_agent_per_doc_from_pinecone(nodes, file_base)
 
             self.agents_dict[file_base] = agent
-            self.extra_info_dict[file_base] = {"summary": summary, "nodes": nodes}
 
-# Assuming the rest of the functionality is implemented elsewhere or as needed
+    def embed_nodes_in_pinecone_index(self):
+        if self.index_name not in self.pc.list_indeces().names():
+            print(f"Starting to build Pinecone index {self.index_name}!")
+
+            # Instantiate the Pinecone VectorIndex
+            PineconeManager(index_name=self.index_name)
+
+            for doc in self.documents:
+                nodes = self.node_parser.get_nodes_from_documents([doc])
+                for node in nodes:
+                    self.id_to_text_map[node.id_] = node.text
+                    embedding = self.client.embeddings.create(
+                        input=node.text, model=self.EMBED_MODEL
+                    )
+                    # print(embedding)
+                    embedding = [record.embedding for record in embedding.data]
+
+                    # prep metadata and upsert batch
+                    meta = [{'text': node.text}]
+                    to_upsert = zip([f'{node.id_}'], embedding, meta)
+                    # upsert to Pinecone
+                    self.pc.index.upsert(vectors=list(to_upsert))
+            print(f"Done building Pinecone index {self.index_name}!")
+        else:
+            print(f"Pinecone index {self.index_name} already exists. Moving on to querying....")
+
+

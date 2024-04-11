@@ -1,7 +1,6 @@
 from src.document_processor import DocumentProcessor
 from src.query_manager import QueryManager
 from config import llm_instance, embedding_instance, HF_TOKEN
-# from src.pincone_manager import PineconeManager
 from transformers import AutoTokenizer
 from sentence_transformers import SentenceTransformer
 from llama_index.embeddings.openai import OpenAIEmbedding
@@ -97,9 +96,11 @@ def main():
 
     index_name = "hiqa-index"
     # Initialize the DocumentProcessor and process documents
-    document_processor = DocumentProcessor(llm_instance, embedding_instance)
+    document_processor = DocumentProcessor(llm_instance, embedding_instance, index_name=index_name)
     document_processor.load_documents()  # Ensure this method is implemented to load your documents
+
     # document_processor.embed_nodes_in_pinecone_index()
+
     document_processor.build_agents()
 
     # Initialize QueryManager with the DocumentProcessor instance
@@ -112,7 +113,6 @@ def main():
     # query_text = "Please provide a list of centres who have been not compliant with the fire precatuion regulation."
     response = master_agent.query(query_text)
     print(f"Response to query '{response}")
-
 
     # start_time = time.time()
     # # Submit a text query
